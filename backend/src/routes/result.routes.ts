@@ -1,0 +1,11 @@
+import { Router } from 'express';
+import * as resultController from '../controllers/result.controller';
+import { authenticate } from '../middleware/authenticate';
+
+const router = Router();
+
+router.get('/:projectId', authenticate, resultController.getProjectResults);
+router.get('/:projectId/history', authenticate, resultController.getProjectHistory);
+router.get('/:projectId/competitors', authenticate, resultController.getCompetitorComparison);
+
+export default router;

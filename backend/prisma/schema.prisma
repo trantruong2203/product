@@ -1,0 +1,142 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Plan {
+  FREE
+  STARTER
+  PRO
+  ENTERPRISE
+}
+
+enum RunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String
+  name      String?
+  plan      Plan     @default(FREE)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  projects Project[]
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  userId      String
+  domain      String
+  brandName   String
+  country     String   @default("US")
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  competitors Competitor[]
+  prompts     Prompt[]
+
+  @@index([userId])
+  @@index([domain])
+}
+
+model Competitor {
+  id         String   @id @default(cuid())
+  projectId  String
+  name       String
+  domain     String
+  createdAt  DateTime @default(now())
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@index([projectId])
+}
+
+model Prompt {
+  id         String   @id @default(cuid())
+  projectId  String
+  query      String   @db.Text
+  language   String   @default("en")
+  isActive   Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  project    Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  runs       Run[]
+
+  @@index([projectId])
+}
+
+model AIEngine {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  domain    String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  runs Run[]
+
+  @@index([name])
+}
+
+model Run {
+  id          String     @id @default(cuid())
+  promptId    String
+  engineId    String
+  status      RunStatus  @default(PENDING)
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  error       String?    @db.Text
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  prompt      Prompt     @relation(fields: [promptId], references: [id], onDelete: Cascade)
+  engine      AIEngine   @relation(fields: [engineId], references: [id])
+  responses   Response[]
+
+  @@index([promptId])
+  @@index([engineId])
+  @@index([status])
+  @@index([startedAt])
+}
+
+model Response {
+  id           String   @id @default(cuid())
+  runId        String
+  responseText String   @db.Text
+  responseHtml String?  @db.Text
+  createdAt    DateTime @default(now())
+
+  run      Run        @relation(fields: [runId], references: [id], onDelete: Cascade)
+  citations Citation[]
+
+  @@index([runId])
+}
+
+model Citation {
+  id          String   @id @default(cuid())
+  responseId  String
+  brand       String
+  domain      String?
+  position    Int?
+  confidence  Float    @default(1.0)
+  context     String?  @db.Text
+  createdAt   DateTime @default(now())
+
+  response    Response @relation(fields: [responseId], references: [id], onDelete: Cascade)
+
+  @@index([responseId])
+  @@index([brand])
+  @@index([domain])
+}
