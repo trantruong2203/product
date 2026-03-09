@@ -19,6 +19,7 @@ export const projects = pgTable('Project', {
   domain: text('domain').notNull(),
   brandName: text('brandName').notNull(),
   country: text('country').notNull().default('US'),
+  keywords: text('keywords').array().notNull().default([]),
   isActive: boolean('isActive').notNull().default(true),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
   updatedAt: timestamp('updatedAt').defaultNow().notNull(),

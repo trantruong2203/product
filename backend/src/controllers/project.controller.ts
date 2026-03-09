@@ -4,6 +4,7 @@ import { projects, competitors, prompts } from '../db/schema.js'
 import { eq, and, desc } from 'drizzle-orm';
 import { AppError } from '../middleware/errorHandler.js';
 import type { AuthRequest } from '../middleware/authenticate.js';
+import { generateProjectPrompts } from '../services/promptGenerator.js';
 
 export const createProject = async (
   req: AuthRequest,
@@ -11,7 +12,7 @@ export const createProject = async (
   next: NextFunction
 ) => {
   try {
-    const { domain, brandName, country } = req.body;
+    const { domain, brandName, country, keywords = [] } = req.body;
     const userId = req.user!.id;
 
     const [project] = await db.insert(projects).values({
@@ -19,7 +20,29 @@ export const createProject = async (
       domain,
       brandName,
       country: country || 'US',
+      keywords,
     }).returning();
+
+    // Auto-generate 100 prompts for the project
+    const generatedPrompts = generateProjectPrompts({
+      brandName,
+      domain,
+      keywords,
+      country: country || 'US',
+    });
+
+    // Insert prompts in batches
+    const batchSize = 50;
+    for (let i = 0; i < generatedPrompts.length; i += batchSize) {
+      const batch = generatedPrompts.slice(i, i + batchSize);
+      const values = batch.map((p) => ({
+        projectId: project.id,
+        query: p.query,
+        language: p.language || 'en',
+        isActive: true,
+      }));
+      await db.insert(prompts).values(values);
+    }
 
     const promptsList = await db.select().from(prompts).where(eq(prompts.projectId, project.id as string));
     const competitorsList = await db.select().from(competitors).where(eq(competitors.projectId, project.id as string));

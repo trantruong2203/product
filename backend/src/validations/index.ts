@@ -15,12 +15,14 @@ export const createProjectSchema = z.object({
   domain: z.string().url('Invalid domain URL'),
   brandName: z.string().min(1, 'Brand name is required'),
   country: z.string().optional().default('US'),
+  keywords: z.array(z.string()).optional().default([]),
 });
 
 export const updateProjectSchema = z.object({
   domain: z.string().url('Invalid domain URL').optional(),
   brandName: z.string().min(1, 'Brand name is required').optional(),
   country: z.string().optional(),
+  keywords: z.array(z.string()).optional(),
   isActive: z.boolean().optional(),
 });
 

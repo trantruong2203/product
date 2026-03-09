@@ -5,22 +5,39 @@
 
 import db from '../config/database.js';
 import { prompts } from '../db/schema.js';
-import { generatePrompts, getStats, GeneratedPrompt } from './generatePrompts.js';
+import { generatePrompts, GeneratedPrompt } from './generatePrompts.js';
+
+export interface InsertPromptsOptions {
+  projectId: string;
+  customPrompts?: GeneratedPrompt[];
+  limit?: number;
+}
 
 /**
  * Insert prompts in batches
  */
-async function insertPrompts(projectId: string, limit?: number): Promise<number> {
+export async function insertPrompts(options: InsertPromptsOptions): Promise<number> {
+  const { projectId, customPrompts, limit } = options;
+  
   console.log(`Generating prompts for project: ${projectId}`);
 
-  let promptData = generatePrompts(projectId);
+  let promptData: GeneratedPrompt[];
+
+  if (customPrompts && customPrompts.length > 0) {
+    // Use custom prompts from parameter
+    promptData = customPrompts;
+    console.log(`Using ${promptData.length} custom prompts`);
+  } else {
+    // Generate from default templates
+    promptData = generatePrompts(projectId);
+  }
 
   if (limit && limit > 0) {
     promptData = promptData.slice(0, limit);
     console.log(`Limiting to ${limit} prompts`);
   }
 
-  console.log(`Generated ${promptData.length} prompts`);
+  console.log(`Total prompts to insert: ${promptData.length}`);
 
   // Get existing prompt queries for this project to avoid duplicates
   const existingPrompts = await db
@@ -76,7 +93,7 @@ async function main() {
   }
 
   try {
-    const count = await insertPrompts(projectId, limit);
+    const count = await insertPrompts({ projectId, limit });
     console.log(`\n=== Summary ===`);
     console.log(`Successfully inserted ${count} prompts for project: ${projectId}`);
   } catch (error) {
