@@ -1,0 +1,91 @@
+{
+  "app": {
+    "loading": "Đang tải..."
+  },
+  "auth": {
+    "login": {
+      "title": "Đăng Nhập",
+      "email": "Email",
+      "password": "Mật khẩu",
+      "submit": "Đăng Nhập",
+      "submitting": "Đang đăng nhập...",
+      "error": "Đăng nhập thất bại",
+      "noAccount": "Chưa có tài khoản?",
+      "signup": "Đăng ký"
+    },
+    "register": {
+      "title": "Tạo Tài Khoản",
+      "name": "Họ tên",
+      "email": "Email",
+      "password": "Mật khẩu",
+      "submit": "Tạo Tài Khoản",
+      "submitting": "Đang tạo tài khoản...",
+      "error": "Đăng ký thất bại",
+      "hasAccount": "Đã có tài khoản?",
+      "signin": "Đăng nhập"
+    }
+  },
+  "dashboard": {
+    "title": "Dự Án Của Tôi",
+    "newProject": "+ Dự Án Mới",
+    "empty": "Chưa có dự án nào. Tạo dự án đầu tiên để bắt đầu theo dõi AI visibility.",
+    "visibility": "Hiển thị",
+    "prompts": "Prompts",
+    "runs": "Lần chạy",
+    "createProject": {
+      "title": "Tạo Dự Án Mới",
+      "brandName": "Tên Thương hiệu",
+      "domain": "Tên miền",
+      "domainPlaceholder": "https://vidu.com",
+      "country": "Quốc gia",
+      "cancel": "Hủy",
+      "create": "Tạo"
+    }
+  },
+  "project": {
+    "runAnalysis": "Chạy Phân Tích",
+    "running": "Đang chạy...",
+    "metrics": {
+      "visibilityScore": "Điểm Hiển Thị",
+      "citationRate": "Tỷ Lệ Trích Dẫn",
+      "promptCoverage": "Phạm Vi Prompt",
+      "avgPosition": "Vị Trí Trung Bình"
+    },
+    "charts": {
+      "visibilityTrend": "Xu Hướng Hiển Thị",
+      "noHistory": "Chưa có dữ liệu lịch sử. Chạy phân tích để xem xu hướng.",
+      "competitorComparison": "So Sánh Đối Thủ",
+      "noCompetitorData": "Chưa có dữ liệu đối thủ."
+    },
+    "prompts": {
+      "title": "Prompts",
+      "add": "+ Thêm",
+      "delete": "Xóa",
+      "empty": "Chưa có prompts.",
+      "modal": {
+        "title": "Thêm Prompt",
+        "query": "Từ khóa tìm kiếm",
+        "language": "Ngôn ngữ",
+        "cancel": "Hủy",
+        "add": "Thêm"
+      }
+    },
+    "competitors": {
+      "title": "Đối Thủ",
+      "add": "+ Thêm",
+      "delete": "Xóa",
+      "empty": "Chưa có đối thủ.",
+      "modal": {
+        "title": "Thêm Đối Thủ",
+        "name": "Tên",
+        "domain": "Tên miền",
+        "cancel": "Hủy",
+        "add": "Thêm"
+      }
+    }
+  },
+  "layout": {
+    "dashboard": "Bảng điều khiển",
+    "logout": "Đăng xuất"
+  }
+}

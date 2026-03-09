@@ -10,9 +10,8 @@ RUN npm install
 # Copy backend source
 COPY backend .
 
-# Generate Prisma client
-RUN npx prisma generate
+RUN npm run build
 
 EXPOSE 3000
 
-CMD ["npx", "tsx", "src/index.ts"]
+CMD ["npm", "start"]

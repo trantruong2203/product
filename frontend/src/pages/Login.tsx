@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { authAPI } from '../services/api';
 import { User } from '../types';
 
@@ -7,6 +9,8 @@ interface LoginProps {
 }
 
 export default function Login({ onLogin }: LoginProps) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -21,9 +25,10 @@ export default function Login({ onLogin }: LoginProps) {
       const res = await authAPI.login({ email, password });
       if (res.data.success) {
         onLogin(res.data.data.user, res.data.data.token);
+        navigate('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Login failed');
+      setError(err.response?.data?.message || t('auth.login.error'));
     } finally {
       setLoading(false);
     }
@@ -33,11 +38,11 @@ export default function Login({ onLogin }: LoginProps) {
     <div className="auth-page">
       <div className="auth-card">
         <h1>GEO SaaS</h1>
-        <h2>Sign In</h2>
+        <h2>{t('auth.login.title')}</h2>
         {error && <div className="error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Email</label>
+            <label>{t('auth.login.email')}</label>
             <input
               type="email"
               value={email}
@@ -46,7 +51,7 @@ export default function Login({ onLogin }: LoginProps) {
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <label>{t('auth.login.password')}</label>
             <input
               type="password"
               value={password}
@@ -55,11 +60,11 @@ export default function Login({ onLogin }: LoginProps) {
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Signing in...' : 'Sign In'}
+            {loading ? t('auth.login.submitting') : t('auth.login.submit')}
           </button>
         </form>
         <p className="auth-link">
-          Don't have an account? <a href="/register">Sign up</a>
+          {t('auth.login.noAccount')} <a href="/register">{t('auth.login.signup')}</a>
         </p>
       </div>
       <style>{`

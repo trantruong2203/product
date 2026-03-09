@@ -2,18 +2,20 @@ import axios from 'axios';
 
 const API_URL = '/api';
 
-const token = localStorage.getItem('token');
-
-export const api = axios.create({
+const api = axios.create({
   baseURL: API_URL,
   headers: {
     'Content-Type': 'application/json',
   },
 });
 
-if (token) {
-  api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-}
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 api.interceptors.response.use(
   response => response,
@@ -47,7 +49,7 @@ export const projectsAPI = {
 export const promptsAPI = {
   getByProject: (projectId: string) => api.get(`/prompts/${projectId}`),
   create: (projectId: string, data: { query: string; language?: string }) =>
-    api.post('/prompts', { ...data, projectId }),
+    api.post(`/prompts/${projectId}`, data),
   delete: (projectId: string, promptId: string) => api.delete(`/prompts/${projectId}/${promptId}`),
 };
 

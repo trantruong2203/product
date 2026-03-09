@@ -1,15 +1,11 @@
-import { PrismaClient } from '@prisma/client';
+import { neon } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-http';
+import * as schema from '../db/schema.js';
 
-const globalForPrisma = globalThis as unknown as {
-  prisma: PrismaClient | undefined;
-};
+export * from '../db/schema.js';
 
-export const prisma = globalForPrisma.prisma ?? new PrismaClient({
-  log: process.env.NODE_ENV === 'development' ? ['error'] : ['error'],
-});
+const sql = neon(process.env.DATABASE_URL!);
 
-if (process.env.NODE_ENV !== 'production') {
-  globalForPrisma.prisma = prisma;
-}
+export const db = drizzle(sql, { schema });
 
-export default prisma;
+export default db;

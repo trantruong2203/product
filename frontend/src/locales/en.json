@@ -1,0 +1,91 @@
+{
+  "app": {
+    "loading": "Loading..."
+  },
+  "auth": {
+    "login": {
+      "title": "Sign In",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign In",
+      "submitting": "Signing in...",
+      "error": "Login failed",
+      "noAccount": "Don't have an account?",
+      "signup": "Sign up"
+    },
+    "register": {
+      "title": "Create Account",
+      "name": "Name",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Create Account",
+      "submitting": "Creating account...",
+      "error": "Registration failed",
+      "hasAccount": "Already have an account?",
+      "signin": "Sign in"
+    }
+  },
+  "dashboard": {
+    "title": "My Projects",
+    "newProject": "+ New Project",
+    "empty": "No projects yet. Create your first project to start tracking AI visibility.",
+    "visibility": "Visibility",
+    "prompts": "Prompts",
+    "runs": "Runs",
+    "createProject": {
+      "title": "Create New Project",
+      "brandName": "Brand Name",
+      "domain": "Domain",
+      "domainPlaceholder": "https://example.com",
+      "country": "Country",
+      "cancel": "Cancel",
+      "create": "Create"
+    }
+  },
+  "project": {
+    "runAnalysis": "Run Analysis",
+    "running": "Running...",
+    "metrics": {
+      "visibilityScore": "Visibility Score",
+      "citationRate": "Citation Rate",
+      "promptCoverage": "Prompt Coverage",
+      "avgPosition": "Avg Position"
+    },
+    "charts": {
+      "visibilityTrend": "Visibility Trend",
+      "noHistory": "No history data yet. Run the analysis to see trends.",
+      "competitorComparison": "Competitor Comparison",
+      "noCompetitorData": "No competitor data yet."
+    },
+    "prompts": {
+      "title": "Prompts",
+      "add": "+ Add",
+      "delete": "Delete",
+      "empty": "No prompts yet.",
+      "modal": {
+        "title": "Add Prompt",
+        "query": "Search Query",
+        "language": "Language",
+        "cancel": "Cancel",
+        "add": "Add"
+      }
+    },
+    "competitors": {
+      "title": "Competitors",
+      "add": "+ Add",
+      "delete": "Delete",
+      "empty": "No competitors yet.",
+      "modal": {
+        "title": "Add Competitor",
+        "name": "Name",
+        "domain": "Domain",
+        "cancel": "Cancel",
+        "add": "Add"
+      }
+    }
+  },
+  "layout": {
+    "dashboard": "Dashboard",
+    "logout": "Logout"
+  }
+}

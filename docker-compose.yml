@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:15
@@ -37,11 +35,11 @@ services:
       dockerfile: ./backend/Dockerfile
     container_name: geo-api
     ports:
-      - "3000:3000"
+      - "3001:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
-      - JWT_SECRET=${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      - DATABASE_URL=postgresql://neondb_owner:npg_zLW4NjT2vfDo@ep-restless-bread-ajcy9dsh-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      - JWT_SECRET=${JWT_SECRET:-9cdad47cd84f4fed321d09cc91d0b4cf74b2abced3cd47eef8c49e205cb622ab}
       - JWT_EXPIRES_IN=7d
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=http://localhost:5173
@@ -59,12 +57,25 @@ services:
     container_name: geo-worker
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+      - DATABASE_URL=postgresql://neondb_owner:npg_zLW4NjT2vfDo@ep-restless-bread-ajcy9dsh-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
       - REDIS_URL=redis://redis:6379
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     depends_on:
-      - redis
-      - postgres
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: ./frontend/Dockerfile
+    container_name: geo-frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api
     restart: unless-stopped
 
 volumes:

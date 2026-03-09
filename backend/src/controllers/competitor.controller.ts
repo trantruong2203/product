@@ -1,33 +1,33 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database.js';
+import db from '../db/index.js';
+import { competitors, projects } from '../db/schema.js'
+import { eq, and, desc } from 'drizzle-orm';
 import { AppError } from '../middleware/errorHandler.js';
-import type { CreateCompetitorInput } from '../validations/index.js';
+import type { AuthRequest } from '../middleware/authenticate.js';
 
 export const createCompetitor = async (
-  req: Request<{ projectId: string }, {}, CreateCompetitorInput>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId } = req.params;
-    const authReq = req as Request<{ projectId: string }, {}, CreateCompetitorInput> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const competitor = await prisma.competitor.create({
-      data: {
-        projectId,
-        name: req.body.name,
-        domain: req.body.domain,
-      },
-    });
+    const [competitor] = await db.insert(competitors).values({
+      projectId: projectId as string,
+      name: req.body.name,
+      domain: req.body.domain,
+    }).returning();
 
     res.status(201).json({
       success: true,
@@ -39,31 +39,30 @@ export const createCompetitor = async (
 };
 
 export const getCompetitors = async (
-  req: Request<{ projectId: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId } = req.params;
-    const authReq = req as Request<{ projectId: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const competitors = await prisma.competitor.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const competitorsList = await db.select().from(competitors)
+      .where(eq(competitors.projectId, projectId as string))
+      .orderBy(desc(competitors.createdAt));
 
     res.json({
       success: true,
-      data: competitors,
+      data: competitorsList,
     });
   } catch (error) {
     next(error);
@@ -71,34 +70,33 @@ export const getCompetitors = async (
 };
 
 export const deleteCompetitor = async (
-  req: Request<{ projectId: string; competitorId: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId, competitorId } = req.params;
-    const authReq = req as Request<{ projectId: string; competitorId: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const competitor = await prisma.competitor.findFirst({
-      where: { id: competitorId, projectId },
-    });
+    const competitorList = await db.select().from(competitors)
+      .where(and(eq(competitors.id, competitorId as string), eq(competitors.projectId, projectId as string)));
+
+    const competitor = competitorList[0];
 
     if (!competitor) {
       throw new AppError('Competitor not found', 404);
     }
 
-    await prisma.competitor.delete({
-      where: { id: competitorId },
-    });
+    await db.delete(competitors).where(eq(competitors.id, competitorId as string));
 
     res.json({
       success: true,

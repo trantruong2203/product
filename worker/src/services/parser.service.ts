@@ -1,5 +1,5 @@
 import { normalizeText, detectBrandMentions, detectPosition } from '../utils/parser.js';
-import { prisma } from '../config/database.js';
+import db, { citations } from '../config/database.js';
 
 export interface ParseResponseData {
   responseId: string;
@@ -28,16 +28,16 @@ export async function parseResponse(data: ParseResponseData): Promise<void> {
 
   for (const brand of allBrands) {
     const mentions = detectBrandMentions(normalizedText, brand.name, brand.domain);
+    console.log(`Brand: ${brand.name}, mentions found: ${mentions.length}`);
     for (const mention of mentions) {
-      await prisma.citation.create({
-        data: {
-          responseId,
-          brand: brand.name,
-          domain: brand.domain,
-          position: mention.position,
-          confidence: mention.confidence,
-          context: mention.context,
-        },
+      console.log(`  - position: ${mention.position}, confidence: ${mention.confidence}, context: "${mention.context}"`);
+      await db.insert(citations).values({
+        responseId,
+        brand: brand.name,
+        domain: brand.domain,
+        position: mention.position,
+        confidence: mention.confidence,
+        context: mention.context,
       });
     }
   }

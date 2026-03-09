@@ -1,44 +1,53 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database.js';
+import db, { runs, prompts, aiEngines, projects, responses, citations, competitors } from '../db/index.js';
+import { eq, and, desc, asc, gte } from 'drizzle-orm';
 import { AppError } from '../middleware/errorHandler.js';
+import type { AuthRequest } from '../middleware/authenticate.js';
 
 export const getProjectResults = async (
-  req: Request<{ projectId: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId } = req.params;
-    const authReq = req as Request<{ projectId: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string  ), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const runs = await prisma.run.findMany({
-      where: {
-        prompt: { projectId },
-        status: 'COMPLETED',
-      },
-      include: {
-        prompt: true,
-        engine: true,
-        responses: {
-          include: {
-            citations: true,
-          },
-        },
-      },
-      orderBy: { finishedAt: 'desc' },
-      take: 100,
-    });
+    const runsData = await db.select().from(runs)
+      .innerJoin(prompts, eq(runs.promptId, prompts.id))
+      .innerJoin(aiEngines, eq(runs.engineId, aiEngines.id))
+      .where(and(eq(prompts.projectId, projectId as string), eq(runs.status, 'COMPLETED')))
+      .orderBy(desc(runs.finishedAt))
+      .limit(100);
 
-    const brandCitations = runs.flatMap(run =>
+    const runsWithDetails = await Promise.all(
+      runsData.map(async (r) => {
+        const responsesData = await db.select().from(responses).where(eq(responses.runId, r.Run.id as string));
+        const responsesWithCitations = await Promise.all(
+          responsesData.map(async (resp) => {
+            const citationsData = await db.select().from(citations).where(eq(citations.responseId, resp.id));
+            return { ...resp, citations: citationsData };
+          })
+        );
+        return {
+          ...r.Run as any,
+          prompt: r.Prompt.id,
+          engine: r.AIEngine.id,
+          responses: responsesWithCitations,
+        };
+      })
+    );
+
+    const brandCitations = runsWithDetails.flatMap(run =>
       run.responses.flatMap(response =>
         response.citations.filter(c => 
           c.brand.toLowerCase() === project.brandName.toLowerCase()
@@ -46,29 +55,27 @@ export const getProjectResults = async (
       )
     );
 
-    const competitorIds = await prisma.competitor.findMany({
-      where: { projectId },
-      select: { name: true },
-    });
+    const competitorsList = await db.select().from(competitors).where(eq(competitors.projectId, projectId as string));
+    const competitorNames = competitorsList.map(c => c.name.toLowerCase());
 
-    const competitorMentions = runs.flatMap(run =>
+    const competitorMentions = runsWithDetails.flatMap(run =>
       run.responses.flatMap(response =>
         response.citations.filter(c => 
-          competitorIds.some(comp => comp.name.toLowerCase() === c.brand.toLowerCase())
+          competitorNames.includes(c.brand.toLowerCase())
         )
       )
     );
 
-    const totalPrompts = await prisma.prompt.count({
-      where: { projectId, isActive: true },
-    });
+    const promptsData = await db.select().from(prompts)
+      .where(and(eq(prompts.projectId, projectId as string), eq(prompts.isActive, true)));
 
+    const totalPrompts = promptsData.length;
     const citedPrompts = new Set(
       brandCitations.map(c => c.responseId)
     ).size;
 
     const citationRate = totalPrompts > 0 ? (citedPrompts / totalPrompts) * 100 : 0;
-    const promptCoverage = runs.length > 0 ? (brandCitations.length / runs.length) * 100 : 0;
+    const promptCoverage = runsWithDetails.length > 0 ? (brandCitations.length / runsWithDetails.length) * 100 : 0;
 
     const avgPosition = brandCitations.length > 0
       ? brandCitations.reduce((sum, c) => sum + (c.position || 0), 0) / brandCitations.length
@@ -84,10 +91,10 @@ export const getProjectResults = async (
         citationRate: Math.round(citationRate * 100) / 100,
         promptCoverage: Math.round(promptCoverage * 100) / 100,
         avgPosition: Math.round(avgPosition * 100) / 100,
-        totalRuns: runs.length,
+        totalRuns: runsWithDetails.length,
         totalCitations: brandCitations.length,
         competitorMentions: competitorMentions.length,
-        recentRuns: runs.slice(0, 10),
+        recentRuns: runsWithDetails.slice(0, 10),
       },
     });
   } catch (error) {
@@ -96,19 +103,19 @@ export const getProjectResults = async (
 };
 
 export const getProjectHistory = async (
-  req: Request<{ projectId: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId } = req.params;
-    const authReq = req as Request<{ projectId: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
     const { days = '30' } = req.query;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
@@ -118,27 +125,37 @@ export const getProjectHistory = async (
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - daysNum);
 
-    const runs = await prisma.run.findMany({
-      where: {
-        prompt: { projectId },
-        status: 'COMPLETED',
-        finishedAt: { gte: startDate },
-      },
-      include: {
-        prompt: true,
-        engine: true,
-        responses: {
-          include: {
-            citations: true,
-          },
-        },
-      },
-      orderBy: { finishedAt: 'asc' },
-    });
+    const runsData = await db.select().from(runs)
+      .innerJoin(prompts, eq(runs.promptId, prompts.id))
+      .innerJoin(aiEngines, eq(runs.engineId, aiEngines.id))
+      .where(and(
+        eq(prompts.projectId, projectId as string),
+        eq(runs.status, 'COMPLETED'),
+        gte(runs.finishedAt, startDate)
+      ))
+      .orderBy(asc(runs.finishedAt));
+
+    const runsWithDetails = await Promise.all(
+      runsData.map(async (r) => {
+        const responsesData = await db.select().from(responses).where(eq(responses.runId, r.Run.id as string));
+        const responsesWithCitations = await Promise.all(
+          responsesData.map(async (resp) => {
+            const citationsData = await db.select().from(citations).where(eq(citations.responseId, resp.id));
+            return { ...resp, citations: citationsData };
+          })
+        );
+        return {
+          ...r.Run as any,
+          prompt: r.Prompt.id,
+          engine: r.AIEngine.id,
+          responses: responsesWithCitations,
+        };
+      })
+    );
 
     const historyMap = new Map<string, { date: string; score: number; citations: number }>();
 
-    for (const run of runs) {
+    for (const run of runsWithDetails) {
       if (!run.finishedAt) continue;
       
       const dateKey = run.finishedAt.toISOString().split('T')[0];
@@ -174,39 +191,48 @@ export const getProjectHistory = async (
 };
 
 export const getCompetitorComparison = async (
-  req: Request<{ projectId: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId } = req.params;
-    const authReq = req as Request<{ projectId: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-      include: { competitors: true },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const runs = await prisma.run.findMany({
-      where: {
-        prompt: { projectId },
-        status: 'COMPLETED',
-      },
-      include: {
-        responses: {
-          include: {
-            citations: true,
-          },
-        },
-      },
-    });
+    const competitorsData = await db.select().from(competitors).where(eq(competitors.projectId, projectId as string));
 
-    const brandCitations = runs.flatMap(run =>
+    const runsData = await db.select().from(runs)
+      .innerJoin(prompts, eq(runs.promptId, prompts.id))
+      .where(and(eq(prompts.projectId, projectId as string), eq(runs.status, 'COMPLETED')));
+
+    const runsWithResponses = await Promise.all(
+      runsData.map(async (r) => {
+        const responsesData = await db.select().from(responses).where(eq(responses.runId, r.Run.id as string));
+        const responsesWithCitations = await Promise.all(
+          responsesData.map(async (resp) => {
+            const citationsData = await db.select().from(citations).where(eq(citations.responseId, resp.id));
+            return { ...resp, citations: citationsData };
+          })
+        );
+        return {
+          ...r.Run as any,
+          prompt: r.Prompt.id,
+          engine: r.Run.engineId,
+          responses: responsesWithCitations as any,
+        };
+      })
+    );
+
+    const brandCitations = runsWithResponses.flatMap(run =>
       run.responses.flatMap(response =>
         response.citations.filter(c => 
           c.brand.toLowerCase() === project.brandName.toLowerCase()
@@ -215,8 +241,8 @@ export const getCompetitorComparison = async (
     ).length;
 
     const competitorData = await Promise.all(
-      project.competitors.map(async (competitor) => {
-        const citations = runs.flatMap(run =>
+      competitorsData.map(async (competitor) => {
+        const citations = runsWithResponses.flatMap(run =>
           run.responses.flatMap(response =>
             response.citations.filter(c => 
               c.brand.toLowerCase() === competitor.name.toLowerCase() ||

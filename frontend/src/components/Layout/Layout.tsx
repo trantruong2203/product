@@ -1,6 +1,6 @@
-import { ReactNode } from 'react';
 import { Link, Outlet } from 'react-router-dom';
-import { User } from '../types';
+import { useTranslation } from 'react-i18next';
+import { User } from '../../types';
 
 interface LayoutProps {
   user: User;
@@ -8,6 +8,7 @@ interface LayoutProps {
 }
 
 export default function Layout({ user, onLogout }: LayoutProps) {
+  const { t } = useTranslation();
   return (
     <div className="layout">
       <header className="header">
@@ -16,13 +17,13 @@ export default function Layout({ user, onLogout }: LayoutProps) {
             GEO SaaS
           </Link>
           <nav className="nav">
-            <Link to="/" className="nav-link">Dashboard</Link>
+            <Link to="/" className="nav-link">{t('layout.dashboard')}</Link>
           </nav>
         </div>
         <div className="header-right">
           <span className="user-email">{user.email}</span>
           <button onClick={onLogout} className="btn-logout">
-            Logout
+            {t('layout.logout')}
           </button>
         </div>
       </header>

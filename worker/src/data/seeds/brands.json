@@ -1,0 +1,36 @@
+{
+  "brands": [
+    "nike",
+    "adidas",
+    "asics",
+    "puma",
+    "new balance",
+    "under armour",
+    "reebok",
+    "converse",
+    "vans",
+    "skechers",
+    "jordan",
+    "mizuno",
+    "brooks",
+    "salomon",
+    "hoka",
+    "on",
+    "fila",
+    "lotto",
+    "diadora",
+    "kappa"
+  ],
+  "competitors": [
+    "nike",
+    "adidas",
+    "puma",
+    "new balance",
+    "under armour",
+    "asics",
+    "reebok",
+    "brooks",
+    "hoka",
+    "salomon"
+  ]
+}

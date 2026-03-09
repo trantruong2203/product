@@ -1,7 +1,16 @@
-import { Job } from 'bullmq';
-import { prisma } from '../config/database.js';
-import { getEngine } from '../engines/baseEngine.js';
-import { parseResponse } from '../services/parser.service.js';
+import { Job } from "bullmq";
+import db from "../config/database.js";
+import {
+  runs,
+  prompts,
+  projects,
+  competitors,
+  responses,
+  citations,
+} from "../db/schema.js";
+import { eq } from "drizzle-orm";
+import { getEngine } from "../engines/baseEngine.js";
+import { parseResponse } from "../services/parser.service.js";
 
 export interface RunPromptJobData {
   runId: string;
@@ -17,53 +26,76 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
   console.log(`Processing run ${runId} for engine ${engineName}`);
 
   try {
-    await prisma.run.update({
-      where: { id: runId },
-      data: {
-        status: 'RUNNING',
+    await db
+      .update(runs)
+      .set({
+        status: "RUNNING",
         startedAt: new Date(),
-      },
-    });
+      })
+      .where(eq(runs.id, runId));
 
     const engine = getEngine(engineName);
     await engine.initialize();
 
     const responseText = await engine.query(prompt);
-    console.log(`Got response for run ${runId}, length: ${responseText.length}`);
+    console.log(
+      `Got response for run ${runId}, length: ${responseText.length}`,
+    );
 
-    const response = await prisma.response.create({
-      data: {
+    const [response] = await db
+      .insert(responses)
+      .values({
         runId,
         responseText,
-        responseHtml: '',
-      },
-    });
+        responseHtml: "",
+      })
+      .returning();
 
-    await prisma.run.update({
-      where: { id: runId },
-      data: {
-        status: 'COMPLETED',
+    await db
+      .update(runs)
+      .set({
+        status: "COMPLETED",
         finishedAt: new Date(),
-      },
-    });
+      })
+      .where(eq(runs.id, runId));
 
-    const project = await prisma.prompt.findUnique({
-      where: { id: promptId },
-      include: { project: { include: { competitors: true } } },
-    });
+    const promptData = await db
+      .select()
+      .from(prompts)
+      .where(eq(prompts.id, promptId));
 
-    if (project) {
-      const competitorNames = project.project.competitors.map((c: { name: string }) => c.name);
-      const competitorDomains = project.project.competitors.map((c: { domain: string }) => c.domain);
+    const promptRecord = promptData[0];
 
-      await parseResponse({
-        responseId: response.id,
-        responseText,
-        brandName: project.project.brandName,
-        domain: project.project.domain,
-        competitorNames,
-        competitorDomains,
-      });
+    if (promptRecord) {
+      const projectData = await db
+        .select()
+        .from(projects)
+        .where(eq(projects.id, promptRecord.projectId));
+
+      const projectRecord = projectData[0];
+
+      if (projectRecord) {
+        const competitorsData = await db
+          .select()
+          .from(competitors)
+          .where(eq(competitors.projectId, projectRecord.id));
+
+        const competitorNames = competitorsData.map(
+          (c: { name: string }) => c.name,
+        );
+        const competitorDomains = competitorsData.map(
+          (c: { domain: string }) => c.domain,
+        );
+
+        await parseResponse({
+          responseId: response.id,
+          responseText,
+          brandName: projectRecord.brandName,
+          domain: projectRecord.domain,
+          competitorNames,
+          competitorDomains,
+        });
+      }
     }
 
     await engine.cleanup();
@@ -71,14 +103,14 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
   } catch (error) {
     console.error(`Error processing run ${runId}:`, error);
 
-    await prisma.run.update({
-      where: { id: runId },
-      data: {
-        status: 'FAILED',
+    await db
+      .update(runs)
+      .set({
+        status: "FAILED",
         finishedAt: new Date(),
-        error: error instanceof Error ? error.message : 'Unknown error',
-      },
-    });
+        error: error instanceof Error ? error.message : "Unknown error",
+      })
+      .where(eq(runs.id, runId));
 
     throw error;
   }

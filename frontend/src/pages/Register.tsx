@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { authAPI } from '../services/api';
 import { User } from '../types';
 
@@ -7,6 +9,8 @@ interface RegisterProps {
 }
 
 export default function Register({ onLogin }: RegisterProps) {
+  const { t } = useTranslation();
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -22,9 +26,10 @@ export default function Register({ onLogin }: RegisterProps) {
       const res = await authAPI.register({ email, password, name });
       if (res.data.success) {
         onLogin(res.data.data.user, res.data.data.token);
+        navigate('/');
       }
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed');
+      setError(err.response?.data?.message || t('auth.register.error'));
     } finally {
       setLoading(false);
     }
@@ -34,11 +39,11 @@ export default function Register({ onLogin }: RegisterProps) {
     <div className="auth-page">
       <div className="auth-card">
         <h1>GEO SaaS</h1>
-        <h2>Create Account</h2>
+        <h2>{t('auth.register.title')}</h2>
         {error && <div className="error">{error}</div>}
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label>Name</label>
+            <label>{t('auth.register.name')}</label>
             <input
               type="text"
               value={name}
@@ -46,7 +51,7 @@ export default function Register({ onLogin }: RegisterProps) {
             />
           </div>
           <div className="form-group">
-            <label>Email</label>
+            <label>{t('auth.register.email')}</label>
             <input
               type="email"
               value={email}
@@ -55,7 +60,7 @@ export default function Register({ onLogin }: RegisterProps) {
             />
           </div>
           <div className="form-group">
-            <label>Password</label>
+            <label>{t('auth.register.password')}</label>
             <input
               type="password"
               value={password}
@@ -64,11 +69,11 @@ export default function Register({ onLogin }: RegisterProps) {
             />
           </div>
           <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? 'Creating account...' : 'Create Account'}
+            {loading ? t('auth.register.submitting') : t('auth.register.submit')}
           </button>
         </form>
         <p className="auth-link">
-          Already have an account? <a href="/login">Sign in</a>
+          {t('auth.register.hasAccount')} <a href="/login">{t('auth.register.signin')}</a>
         </p>
       </div>
       <style>{`

@@ -10,13 +10,7 @@ RUN npm install
 # Copy worker source
 COPY worker .
 
-# Copy prisma schema and env from backend
-COPY backend/prisma ./prisma
-COPY backend/.env ./.env
-
-RUN npx prisma generate
-
-RUN npx tsc
+RUN npm run build
 
 RUN npx playwright install --with-deps chromium
 

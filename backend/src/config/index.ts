@@ -1,7 +1,21 @@
 import dotenv from 'dotenv';
 dotenv.config();
 
-export const config = {
+interface JwtConfig {
+  secret: string;
+  expiresIn: string;
+}
+
+interface Config {
+  nodeEnv: string;
+  port: number;
+  database: { url: string };
+  jwt: JwtConfig;
+  redis: { url: string };
+  cors: { origin: string };
+}
+
+export const config: Config = {
   nodeEnv: process.env.NODE_ENV || 'development',
   port: parseInt(process.env.PORT || '3000', 10),
   database: {

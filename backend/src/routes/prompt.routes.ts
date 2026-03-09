@@ -6,7 +6,7 @@ import { authenticate } from '../middleware/authenticate';
 
 const router = Router();
 
-router.post('/', authenticate, validateBody(createPromptSchema), promptController.createPrompt);
+router.post('/:projectId', authenticate, validateBody(createPromptSchema), promptController.createPrompt);
 router.get('/:projectId', authenticate, promptController.getPrompts);
 router.delete('/:projectId/:promptId', authenticate, promptController.deletePrompt);
 

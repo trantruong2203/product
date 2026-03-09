@@ -1,34 +1,33 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProjectDetail from './pages/ProjectDetail';
 import Layout from './components/Layout/Layout';
+import { authAPI } from './services/api';
 
 interface User {
   id: string;
   email: string;
   name?: string;
   plan: string;
+  createdAt?: string;
 }
 
 function App() {
+  const { t } = useTranslation();
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const token = localStorage.getItem('token');
     if (token) {
-      fetch('/api/auth/me', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            setUser(data.data);
+      authAPI.getMe()
+        .then(res => {
+          if (res.data.success) {
+            setUser(res.data.data);
           }
         })
         .catch(console.error)
@@ -49,7 +48,7 @@ function App() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div>{t('app.loading')}</div>;
   }
 
   return (

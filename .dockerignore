@@ -1,0 +1,48 @@
+# Dependencies
+node_modules
+bower_components
+
+# Build outputs
+dist
+build
+
+# Logs
+logs
+*.log
+npm-debug.log*
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git
+.gitignore
+
+# Chrome profile - large and not needed in container
+worker/src/chrome-profile
+worker/chrome-profile
+worker/src/sessions
+
+# Docker
+Dockerfile
+docker-compose*.yml
+
+# Test
+coverage
+.nyc_output
+
+# Docs
+*.md
+!README.md

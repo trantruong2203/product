@@ -1,105 +1,169 @@
 export function normalizeText(text: string): string {
   return text
+    .replace(/\r/g, "")
+    .replace(/\t/g, " ")
+    .replace(/[^\w\s\n]/g, " ")
+    .replace(/\s+/g, " ")
     .toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .replace(/\s+/g, ' ')
     .trim();
 }
 
 export interface Mention {
-  position: number | null;
-  confidence: number;
-  context: string;
+  position: number | null
+  confidence: number
+  context: string
 }
 
+/**
+ * Detect brand mentions + ranking inference
+ */
 export function detectBrandMentions(
   text: string,
   brandName: string,
   domain: string
 ): Mention[] {
-  const mentions: Mention[] = [];
-  const normalizedBrand = normalizeText(brandName);
-  const brandWords = normalizedBrand.split(' ').filter(w => w.length > 2);
 
-  const regex = new RegExp(brandWords.join('|'), 'gi');
-  let match;
+  const mentions: Mention[] = []
 
-  while ((match = regex.exec(text)) !== null) {
-    const start = Math.max(0, match.index - 50);
-    const end = Math.min(text.length, match.index + match[0].length + 50);
-    const context = text.slice(start, end);
-    const position = detectPosition(text, match.index);
+  const normalizedText = normalizeText(text)
 
-    mentions.push({
-      position,
-      confidence: calculateConfidence(match[0], normalizedBrand),
-      context,
-    });
-  }
+  const lines = normalizedText.split("\n")
 
-  if (domain) {
-    const domainParts = domain.replace(/^(https?:\/\/)?(www\.)?/, '').split('.');
-    for (const part of domainParts) {
-      if (part.length > 3) {
-        const domainRegex = new RegExp(`\\b${part}\\b`, 'gi');
-        let domainMatch: RegExpExecArray | null;
-        while ((domainMatch = domainRegex.exec(text)) !== null) {
-          if (!mentions.some(m => m.context.includes(domainMatch![0]))) {
-            const start = Math.max(0, domainMatch.index - 50);
-            const end = Math.min(text.length, domainMatch.index + domainMatch[0].length + 50);
-            const context = text.slice(start, end);
-            mentions.push({
-              position: detectPosition(text, domainMatch.index),
-              confidence: 0.7,
-              context,
-            });
-          }
-        }
+  const brand = normalizeText(brandName)
+
+  const brandWords = brand.split(" ").filter(w => w.length > 2)
+
+  const rankings = extractRankings(normalizedText)
+
+  for (let i = 0; i < lines.length; i++) {
+
+    const line = lines[i]
+
+    if (!line) continue
+
+    if (
+      brandWords.some(w => line.includes(w)) ||
+      (domain && line.includes(domain))
+    ) {
+
+      let position: number | null = null
+
+      const rankingMatch = rankings.find(r =>
+        line.includes(normalizeText(r.name))
+      )
+
+      if (rankingMatch) {
+        position = rankingMatch.position
+      } else {
+        position = inferPositionFromSentence(lines, i)
       }
+
+      mentions.push({
+        position,
+        confidence: calculateConfidence(line, brand),
+        context: line
+      })
     }
   }
 
-  return mentions;
+  return mentions
 }
 
-function calculateConfidence(match: string, brand: string): number {
-  const matchNorm = normalizeText(match);
-  if (matchNorm === brand) return 1.0;
-  if (brand.includes(matchNorm) || matchNorm.includes(brand)) return 0.8;
-  return 0.5;
-}
+/**
+ * Detect ranking from numbered lists
+ */
+export function extractRankings(
+  text: string
+): Array<{ position: number; name: string }> {
 
-export function detectPosition(text: string, mentionIndex: number): number | null {
-  const textBefore = text.slice(0, mentionIndex);
-  const lines = textBefore.split(/\n/);
-  const currentLine = lines[lines.length - 1];
-  
-  const numberMatch = currentLine.match(/(\d+)/);
-  if (numberMatch) {
-    return parseInt(numberMatch[1], 10);
-  }
+  const rankings: Array<{ position: number; name: string }> = []
 
-  const rankingKeywords = ['first', 'second', 'third', 'fourth', 'fifth', 'top', 'best', 'leading'];
-  for (const keyword of rankingKeywords) {
-    if (textBefore.toLowerCase().includes(keyword)) {
-      return 1;
-    }
-  }
+  const numberedPattern = /^(\d+)[\.\)]\s*([^\n]+)/gm
 
-  return null;
-}
-
-export function extractRankings(text: string): Array<{ position: number; name: string }> {
-  const rankings: Array<{ position: number; name: string }> = [];
-  const numberedPattern = /^(\d+)[\.\)]\s*([A-Z][^\n]+)/gm;
-  let match;
+  let match
 
   while ((match = numberedPattern.exec(text)) !== null) {
-    rankings.push({
-      position: parseInt(match[1], 10),
-      name: match[2].trim(),
-    });
+
+    const pos = parseInt(match[1], 10)
+
+    if (pos <= 20) {
+
+      rankings.push({
+        position: pos,
+        name: match[2].trim()
+      })
+    }
   }
 
-  return rankings;
+  return rankings
+}
+
+/**
+ * Infer ranking when no numbered list
+ */
+function inferPositionFromSentence(lines: string[], index: number): number {
+
+  const rankingWords = [
+    "best",
+    "top",
+    "leading",
+    "recommended",
+    "popular"
+  ]
+
+  const line = lines[index]
+
+  if (rankingWords.some(w => line.includes(w))) {
+    return 1
+  }
+
+  return index + 1
+}
+
+/**
+ * Confidence scoring
+ */
+function calculateConfidence(text: string, brand: string): number {
+
+  const normalized = normalizeText(text)
+
+  if (normalized.includes(brand)) {
+    return 1
+  }
+
+  const words = brand.split(" ")
+
+  if (words.some(w => normalized.includes(w))) {
+    return 0.8
+  }
+
+  return 0.5
+}
+
+/**
+ * Legacy position detector (safe fallback)
+ */
+export function detectPosition(
+  text: string,
+  mentionIndex: number
+): number | null {
+
+  const start = Math.max(0, mentionIndex - 120)
+
+  const end = Math.min(text.length, mentionIndex + 120)
+
+  const context = text.slice(start, end)
+
+  const rankMatch = context.match(/(^|\n)\s*(\d+)[\.\)]/)
+
+  if (rankMatch) {
+
+    const rank = parseInt(rankMatch[2], 10)
+
+    if (rank <= 20) {
+      return rank
+    }
+  }
+
+  return null
 }

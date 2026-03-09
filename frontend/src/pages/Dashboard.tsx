@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { projectsAPI, resultsAPI } from '../services/api';
 import { Project, ProjectResults } from '../types';
 
 export default function Dashboard() {
+  const { t } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -56,21 +58,21 @@ export default function Dashboard() {
   };
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <div>{t('app.loading')}</div>;
   }
 
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>My Projects</h1>
+        <h1>{t('dashboard.title')}</h1>
         <button onClick={() => setShowModal(true)} className="btn-primary">
-          + New Project
+          {t('dashboard.newProject')}
         </button>
       </div>
 
       {projects.length === 0 ? (
         <div className="empty-state">
-          <p>No projects yet. Create your first project to start tracking AI visibility.</p>
+          <p>{t('dashboard.empty')}</p>
         </div>
       ) : (
         <div className="projects-grid">
@@ -83,15 +85,15 @@ export default function Dashboard() {
                 <div className="project-stats">
                   <div className="stat">
                     <span className="stat-value">{results?.visibilityScore || 0}</span>
-                    <span className="stat-label">Visibility</span>
+                    <span className="stat-label">{t('dashboard.visibility')}</span>
                   </div>
                   <div className="stat">
                     <span className="stat-value">{project._count.prompts}</span>
-                    <span className="stat-label">Prompts</span>
+                    <span className="stat-label">{t('dashboard.prompts')}</span>
                   </div>
                   <div className="stat">
                     <span className="stat-value">{project._count.runs}</span>
-                    <span className="stat-label">Runs</span>
+                    <span className="stat-label">{t('dashboard.runs')}</span>
                   </div>
                 </div>
               </Link>
@@ -103,10 +105,10 @@ export default function Dashboard() {
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Create New Project</h2>
+            <h2>{t('dashboard.createProject.title')}</h2>
             <form onSubmit={handleCreateProject}>
               <div className="form-group">
-                <label>Brand Name</label>
+                <label>{t('dashboard.createProject.brandName')}</label>
                 <input
                   type="text"
                   value={newProject.brandName}
@@ -115,17 +117,17 @@ export default function Dashboard() {
                 />
               </div>
               <div className="form-group">
-                <label>Domain</label>
+                <label>{t('dashboard.createProject.domain')}</label>
                 <input
                   type="url"
                   value={newProject.domain}
                   onChange={e => setNewProject({ ...newProject, domain: e.target.value })}
-                  placeholder="https://example.com"
+                  placeholder={t('dashboard.createProject.domainPlaceholder')}
                   required
                 />
               </div>
               <div className="form-group">
-                <label>Country</label>
+                <label>{t('dashboard.createProject.country')}</label>
                 <select
                   value={newProject.country}
                   onChange={e => setNewProject({ ...newProject, country: e.target.value })}
@@ -137,10 +139,10 @@ export default function Dashboard() {
               </div>
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">
-                  Cancel
+                  {t('dashboard.createProject.cancel')}
                 </button>
                 <button type="submit" className="btn-primary">
-                  Create
+                  {t('dashboard.createProject.create')}
                 </button>
               </div>
             </form>

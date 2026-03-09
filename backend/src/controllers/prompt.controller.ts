@@ -1,33 +1,32 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database.js';
+import db, { prompts, projects } from '../db/index.js';
+import { eq, and, desc } from 'drizzle-orm';
 import { AppError } from '../middleware/errorHandler.js';
-import type { CreatePromptInput } from '../validations/index.js';
+import type { AuthRequest } from '../middleware/authenticate.js';
 
 export const createPrompt = async (
-  req: Request<{ projectId: string }, {}, CreatePromptInput>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId } = req.params;
-    const authReq = req as Request<{ projectId: string }, {}, CreatePromptInput> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const prompt = await prisma.prompt.create({
-      data: {
-        projectId,
-        query: req.body.query,
-        language: req.body.language || 'en',
-      },
-    });
+    const [prompt] = await db.insert(prompts).values({
+      projectId: projectId as string,
+      query: req.body.query,
+      language: req.body.language || 'en',
+    }).returning();
 
     res.status(201).json({
       success: true,
@@ -39,31 +38,30 @@ export const createPrompt = async (
 };
 
 export const getPrompts = async (
-  req: Request<{ projectId: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId } = req.params;
-    const authReq = req as Request<{ projectId: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const prompts = await prisma.prompt.findMany({
-      where: { projectId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const promptsList = await db.select().from(prompts)
+      .where(eq(prompts.projectId, projectId as string))
+      .orderBy(desc(prompts.createdAt));
 
     res.json({
       success: true,
-      data: prompts,
+      data: promptsList,
     });
   } catch (error) {
     next(error);
@@ -71,34 +69,33 @@ export const getPrompts = async (
 };
 
 export const deletePrompt = async (
-  req: Request<{ projectId: string; promptId: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { projectId, promptId } = req.params;
-    const authReq = req as Request<{ projectId: string; promptId: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, userId },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, projectId as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
-    const prompt = await prisma.prompt.findFirst({
-      where: { id: promptId, projectId },
-    });
+    const promptList = await db.select().from(prompts)
+      .where(and(eq(prompts.id, promptId as string), eq(prompts.projectId, projectId as string)));
+
+    const prompt = promptList[0];
 
     if (!prompt) {
       throw new AppError('Prompt not found', 404);
     }
 
-    await prisma.prompt.delete({
-      where: { id: promptId },
-    });
+    await db.delete(prompts).where(eq(prompts.id, promptId as string));
 
     res.json({
       success: true,

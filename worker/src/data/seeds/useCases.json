@@ -1,0 +1,36 @@
+{
+  "use_cases": [
+    "marathon",
+    "beginners",
+    "flat feet",
+    "long distance",
+    "trail running",
+    "sprint",
+    "track and field",
+    "cross country",
+    "indoor workout",
+    "outdoor running",
+    "weightlifting",
+    "cross training",
+    "daily commute",
+    "casual wear",
+    "professional sports",
+    "recovery",
+    "pregnancy",
+    "overpronation",
+    "underpronation",
+    "neutral"
+  ],
+  "problems": [
+    "plantar fasciitis",
+    "shin splints",
+    "runner knee",
+    "achilles tendonitis",
+    "blisters",
+    "arch pain",
+    "heel pain",
+    "knee pain",
+    "ankle support",
+    "foot odor"
+  ]
+}

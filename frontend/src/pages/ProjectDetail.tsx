@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { projectsAPI, promptsAPI, competitorsAPI, runsAPI, resultsAPI, enginesAPI } from '../services/api';
 import { Project, Prompt, Competitor, AIEngine, ProjectResults, HistoryData, CompetitorComparison } from '../types';
 
 export default function ProjectDetail() {
+  const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const [project, setProject] = useState<Project | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
@@ -111,7 +113,7 @@ export default function ProjectDetail() {
     }
   };
 
-  if (loading) return <div>Loading...</div>;
+  if (loading) return <div>{t('app.loading')}</div>;
 
   return (
     <div className="project-detail">
@@ -121,32 +123,32 @@ export default function ProjectDetail() {
           <p className="domain">{project?.domain}</p>
         </div>
         <button onClick={handleRun} disabled={running || prompts.length === 0} className="btn-primary">
-          {running ? 'Running...' : 'Run Analysis'}
+          {running ? t('project.running') : t('project.runAnalysis')}
         </button>
       </div>
 
       <div className="metrics-grid">
         <div className="metric-card primary">
           <div className="metric-value">{results?.visibilityScore || 0}</div>
-          <div className="metric-label">Visibility Score</div>
+          <div className="metric-label">{t('project.metrics.visibilityScore')}</div>
         </div>
         <div className="metric-card">
           <div className="metric-value">{results?.citationRate || 0}%</div>
-          <div className="metric-label">Citation Rate</div>
+          <div className="metric-label">{t('project.metrics.citationRate')}</div>
         </div>
         <div className="metric-card">
           <div className="metric-value">{results?.promptCoverage || 0}%</div>
-          <div className="metric-label">Prompt Coverage</div>
+          <div className="metric-label">{t('project.metrics.promptCoverage')}</div>
         </div>
         <div className="metric-card">
           <div className="metric-value">{results?.avgPosition || 'N/A'}</div>
-          <div className="metric-label">Avg Position</div>
+          <div className="metric-label">{t('project.metrics.avgPosition')}</div>
         </div>
       </div>
 
       <div className="charts-section">
         <div className="chart-card">
-          <h3>Visibility Trend</h3>
+          <h3>{t('project.charts.visibilityTrend')}</h3>
           {history.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <LineChart data={history}>
@@ -158,11 +160,11 @@ export default function ProjectDetail() {
               </LineChart>
             </ResponsiveContainer>
           ) : (
-            <p className="no-data">No history data yet. Run the analysis to see trends.</p>
+            <p className="no-data">{t('project.charts.noHistory')}</p>
           )}
         </div>
         <div className="chart-card">
-          <h3>Competitor Comparison</h3>
+          <h3>{t('project.charts.competitorComparison')}</h3>
           {competitorData.length > 0 ? (
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={competitorData}>
@@ -174,7 +176,7 @@ export default function ProjectDetail() {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <p className="no-data">No competitor data yet.</p>
+            <p className="no-data">{t('project.charts.noCompetitorData')}</p>
           )}
         </div>
       </div>
@@ -182,23 +184,23 @@ export default function ProjectDetail() {
       <div className="tables-section">
         <div className="table-card">
           <div className="table-header">
-            <h3>Prompts ({prompts.length})</h3>
-            <button onClick={() => setShowPromptModal(true)} className="btn-small">+ Add</button>
+            <h3>{t('project.prompts.title')} ({prompts.length})</h3>
+            <button onClick={() => setShowPromptModal(true)} className="btn-small">{t('project.prompts.add')}</button>
           </div>
           <div className="table-list">
             {prompts.map(prompt => (
               <div key={prompt.id} className="table-row">
                 <span className="query">{prompt.query}</span>
-                <button onClick={() => handleDeletePrompt(prompt.id)} className="btn-delete">Delete</button>
+                <button onClick={() => handleDeletePrompt(prompt.id)} className="btn-delete">{t('project.prompts.delete')}</button>
               </div>
             ))}
-            {prompts.length === 0 && <p className="empty">No prompts yet.</p>}
+            {prompts.length === 0 && <p className="empty">{t('project.prompts.empty')}</p>}
           </div>
         </div>
         <div className="table-card">
           <div className="table-header">
-            <h3>Competitors ({competitors.length})</h3>
-            <button onClick={() => setShowCompetitorModal(true)} className="btn-small">+ Add</button>
+            <h3>{t('project.competitors.title')} ({competitors.length})</h3>
+            <button onClick={() => setShowCompetitorModal(true)} className="btn-small">{t('project.competitors.add')}</button>
           </div>
           <div className="table-list">
             {competitors.map(comp => (
@@ -207,10 +209,10 @@ export default function ProjectDetail() {
                   <div className="name">{comp.name}</div>
                   <div className="domain">{comp.domain}</div>
                 </div>
-                <button onClick={() => handleDeleteCompetitor(comp.id)} className="btn-delete">Delete</button>
+                <button onClick={() => handleDeleteCompetitor(comp.id)} className="btn-delete">{t('project.competitors.delete')}</button>
               </div>
             ))}
-            {competitors.length === 0 && <p className="empty">No competitors yet.</p>}
+            {competitors.length === 0 && <p className="empty">{t('project.competitors.empty')}</p>}
           </div>
         </div>
       </div>
@@ -218,10 +220,10 @@ export default function ProjectDetail() {
       {showPromptModal && (
         <div className="modal-overlay" onClick={() => setShowPromptModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Add Prompt</h2>
+            <h2>{t('project.prompts.modal.title')}</h2>
             <form onSubmit={handleCreatePrompt}>
               <div className="form-group">
-                <label>Search Query</label>
+                <label>{t('project.prompts.modal.query')}</label>
                 <textarea
                   value={newPrompt.query}
                   onChange={e => setNewPrompt({ ...newPrompt, query: e.target.value })}
@@ -230,15 +232,15 @@ export default function ProjectDetail() {
                 />
               </div>
               <div className="form-group">
-                <label>Language</label>
+                <label>{t('project.prompts.modal.language')}</label>
                 <select value={newPrompt.language} onChange={e => setNewPrompt({ ...newPrompt, language: e.target.value })}>
                   <option value="en">English</option>
                   <option value="vi">Vietnamese</option>
                 </select>
               </div>
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowPromptModal(false)} className="btn-secondary">Cancel</button>
-                <button type="submit" className="btn-primary">Add</button>
+                <button type="button" onClick={() => setShowPromptModal(false)} className="btn-secondary">{t('project.prompts.modal.cancel')}</button>
+                <button type="submit" className="btn-primary">{t('project.prompts.modal.add')}</button>
               </div>
             </form>
           </div>
@@ -248,10 +250,10 @@ export default function ProjectDetail() {
       {showCompetitorModal && (
         <div className="modal-overlay" onClick={() => setShowCompetitorModal(false)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>Add Competitor</h2>
+            <h2>{t('project.competitors.modal.title')}</h2>
             <form onSubmit={handleCreateCompetitor}>
               <div className="form-group">
-                <label>Name</label>
+                <label>{t('project.competitors.modal.name')}</label>
                 <input
                   type="text"
                   value={newCompetitor.name}
@@ -260,7 +262,7 @@ export default function ProjectDetail() {
                 />
               </div>
               <div className="form-group">
-                <label>Domain</label>
+                <label>{t('project.competitors.modal.domain')}</label>
                 <input
                   type="url"
                   value={newCompetitor.domain}
@@ -269,8 +271,8 @@ export default function ProjectDetail() {
                 />
               </div>
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowCompetitorModal(false)} className="btn-secondary">Cancel</button>
-                <button type="submit" className="btn-primary">Add</button>
+                <button type="button" onClick={() => setShowCompetitorModal(false)} className="btn-secondary">{t('project.competitors.modal.cancel')}</button>
+                <button type="submit" className="btn-primary">{t('project.competitors.modal.add')}</button>
               </div>
             </form>
           </div>

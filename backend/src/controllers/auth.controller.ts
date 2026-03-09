@@ -1,10 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
 import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { prisma } from '../config/database.js'
-import { config } from '../config/index.js'
-import { AppError } from '../../middleware/errorHandler.js'
-import type { RegisterInput, LoginInput } from '../../validations/index.js'
+import jwt, { SignOptions } from 'jsonwebtoken';
+import { users } from '../db/schema.js';
+import { eq } from 'drizzle-orm';
+import { config } from '../config/index.js';
+import { AppError } from '../middleware/errorHandler.js';
+import type { RegisterInput, LoginInput } from '../validations/index.js';
+import type { AuthRequest } from '../middleware/authenticate.js';
+import { db } from '../db/index.js';
 
 export const register = async (
   req: Request<{}, {}, RegisterInput>,
@@ -14,8 +17,8 @@ export const register = async (
   try {
     const { email, password, name } = req.body;
 
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
+    const existingUser = await db.query.users.findFirst({
+      where: eq(users.email, email),
     });
 
     if (existingUser) {
@@ -24,25 +27,26 @@ export const register = async (
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
-      data: {
-        email,
-        password: hashedPassword,
-        name,
-      },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        plan: true,
-        createdAt: true,
-      },
+    const [user] = await db.insert(users).values({
+      email,
+      password: hashedPassword,
+      name,
+    }).returning({
+      id: users.id,
+      email: users.email,
+      name: users.name,
+      plan: users.plan,
+      createdAt: users.createdAt,
     });
+
+    const jwtOptions: SignOptions = {
+      expiresIn: config.jwt.expiresIn as `${number}d`,
+    };
 
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
+      jwtOptions
     );
 
     res.status(201).json({
@@ -65,8 +69,8 @@ export const login = async (
   try {
     const { email, password } = req.body;
 
-    const user = await prisma.user.findUnique({
-      where: { email },
+    const user = await db.query.users.findFirst({
+      where: eq(users.email, email),
     });
 
     if (!user) {
@@ -79,10 +83,14 @@ export const login = async (
       throw new AppError('Invalid credentials', 401);
     }
 
+    const jwtOptions: SignOptions = {
+      expiresIn: config.jwt.expiresIn as `${number}d`,
+    };
+
     const token = jwt.sign(
       { userId: user.id, email: user.email },
       config.jwt.secret,
-      { expiresIn: config.jwt.expiresIn }
+      jwtOptions
     );
 
     res.json({
@@ -103,22 +111,13 @@ export const login = async (
 };
 
 export const getMe = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const authReq = req as Request & { user: { id: string } };
-
-    const user = await prisma.user.findUnique({
-      where: { id: authReq.user.id },
-      select: {
-        id: true,
-        email: true,
-        name: true,
-        plan: true,
-        createdAt: true,
-      },
+    const user = await db.query.users.findFirst({
+      where: eq(users.id, req.user!.id),
     });
 
     if (!user) {
@@ -127,7 +126,13 @@ export const getMe = async (
 
     res.json({
       success: true,
-      data: user,
+      data: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        plan: user.plan,
+        createdAt: user.createdAt,
+      },
     });
   } catch (error) {
     next(error);

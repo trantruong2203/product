@@ -1,38 +1,38 @@
 import { Request, Response, NextFunction } from 'express';
-import { prisma } from '../config/database.js';
+import db from '../db/index.js';
+import { projects, competitors, prompts } from '../db/schema.js'
+import { eq, and, desc } from 'drizzle-orm';
 import { AppError } from '../middleware/errorHandler.js';
-import type { CreateProjectInput, UpdateProjectInput } from '../validations/index.js';
+import type { AuthRequest } from '../middleware/authenticate.js';
 
 export const createProject = async (
-  req: Request<{}, {}, CreateProjectInput>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const authReq = req as Request<{}, {}, CreateProjectInput & { user: { id: string } }>;
     const { domain, brandName, country } = req.body;
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.create({
-      data: {
-        userId,
-        domain,
-        brandName,
-        country: country || 'US',
-      },
-      include: {
-        _count: {
-          select: {
-            prompts: true,
-            competitors: true,
-          },
-        },
-      },
-    });
+    const [project] = await db.insert(projects).values({
+      userId,
+      domain,
+      brandName,
+      country: country || 'US',
+    }).returning();
+
+    const promptsList = await db.select().from(prompts).where(eq(prompts.projectId, project.id as string));
+    const competitorsList = await db.select().from(competitors).where(eq(competitors.projectId, project.id as string));
 
     res.status(201).json({
       success: true,
-      data: project,
+      data: {
+        ...project,
+        _count: {
+          prompts: promptsList.length,
+          competitors: competitorsList.length,
+        },
+      },
     });
   } catch (error) {
     next(error);
@@ -40,35 +40,42 @@ export const createProject = async (
 };
 
 export const getProjects = async (
-  req: Request,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
-    const authReq = req as Request & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const projects = await prisma.project.findMany({
-      where: { userId },
-      include: {
-        _count: {
-          select: {
-            prompts: true,
-            competitors: true,
-            runs: true,
+    const projectsList = await db.select().from(projects)
+      .where(eq(projects.userId, userId))
+      .orderBy(desc(projects.createdAt));
+
+    const projectsWithCounts = await Promise.all(
+      projectsList.map(async (project) => {
+        const promptsList = await db.select().from(prompts).where(eq(prompts.projectId, project.id));
+        const competitorsList = await db.select().from(competitors).where(eq(competitors.projectId, project.id));
+        
+        const recentPrompts = await db.select().from(prompts)
+          .where(eq(prompts.projectId, project.id))
+          .limit(5)
+          .orderBy(desc(prompts.createdAt));
+
+        return {
+          ...project,
+          _count: {
+            prompts: promptsList.length,
+            competitors: competitorsList.length,
+            runs: 0,
           },
-        },
-        prompts: {
-          take: 5,
-          orderBy: { createdAt: 'desc' },
-        },
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+          prompts: recentPrompts,
+        };
+      })
+    );
 
     res.json({
       success: true,
-      data: projects,
+      data: projectsWithCounts,
     });
   } catch (error) {
     next(error);
@@ -76,42 +83,42 @@ export const getProjects = async (
 };
 
 export const getProject = async (
-  req: Request<{ id: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { id } = req.params;
-    const authReq = req as Request<{ id: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const project = await prisma.project.findFirst({
-      where: {
-        id,
-        userId,
-      },
-      include: {
-        competitors: true,
-        prompts: {
-          where: { isActive: true },
-        },
-        _count: {
-          select: {
-            prompts: true,
-            competitors: true,
-            runs: true,
-          },
-        },
-      },
-    });
+    const projectList = await db.select().from(projects)
+      .where(and(eq(projects.id, id as string), eq(projects.userId, userId)));
+
+    const project = projectList[0];
 
     if (!project) {
       throw new AppError('Project not found', 404);
     }
 
+    const competitorsList = await db.select().from(competitors).where(eq(competitors.projectId, id as string));
+    const promptsList = await db.select().from(prompts)
+      .where(and(eq(prompts.projectId, id as string), eq(prompts.isActive, true)));
+
+    const promptsAll = await db.select().from(prompts).where(eq(prompts.projectId, id as string));
+    const competitorsAll = await db.select().from(competitors).where(eq(competitors.projectId, id as string));
+
     res.json({
       success: true,
-      data: project,
+      data: {
+        ...project,
+        competitors: competitorsList,
+        prompts: promptsList,
+        _count: {
+          prompts: promptsAll.length,
+          competitors: competitorsAll.length,
+          runs: 0,
+        },
+      },
     });
   } catch (error) {
     next(error);
@@ -119,39 +126,40 @@ export const getProject = async (
 };
 
 export const updateProject = async (
-  req: Request<{ id: string }, {}, UpdateProjectInput>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { id } = req.params;
-    const authReq = req as Request<{ id: string }, {}, UpdateProjectInput> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const existingProject = await prisma.project.findFirst({
-      where: { id, userId },
-    });
+    const existingList = await db.select().from(projects)
+      .where(and(eq(projects.id, id as string), eq(projects.userId, userId)));
+
+    const existingProject = existingList[0];
 
     if (!existingProject) {
       throw new AppError('Project not found', 404);
     }
 
-    const project = await prisma.project.update({
-      where: { id },
-      data: req.body,
-      include: {
-        _count: {
-          select: {
-            prompts: true,
-            competitors: true,
-          },
-        },
-      },
-    });
+    const [project] = await db.update(projects)
+      .set(req.body)
+      .where(eq(projects.id, id as string))
+      .returning();
+
+    const promptsList = await db.select().from(prompts).where(eq(prompts.projectId, project.id as string));
+    const competitorsList = await db.select().from(competitors).where(eq(competitors.projectId, project.id as string));
 
     res.json({
       success: true,
-      data: project,
+      data: {
+        ...project,
+        _count: {
+          prompts: promptsList.length,
+          competitors: competitorsList.length,
+        },
+      },
     });
   } catch (error) {
     next(error);
@@ -159,26 +167,24 @@ export const updateProject = async (
 };
 
 export const deleteProject = async (
-  req: Request<{ id: string }>,
+  req: AuthRequest,
   res: Response,
   next: NextFunction
 ) => {
   try {
     const { id } = req.params;
-    const authReq = req as Request<{ id: string }> & { user: { id: string } };
-    const userId = authReq.user!.id;
+    const userId = req.user!.id;
 
-    const existingProject = await prisma.project.findFirst({
-      where: { id, userId },
-    });
+    const existingList = await db.select().from(projects)
+      .where(and(eq(projects.id, id as string), eq(projects.userId, userId)));
+
+    const existingProject = existingList[0];
 
     if (!existingProject) {
       throw new AppError('Project not found', 404);
     }
 
-    await prisma.project.delete({
-      where: { id },
-    });
+    await db.delete(projects).where(eq(projects.id, id as string));
 
     res.json({
       success: true,
