@@ -121,6 +121,10 @@ Please provide a detailed response about how ${brandName} appears in AI search r
   const engineUrl = getEngineUrl(engineName);
   const apiKey = getEngineApiKey(engineName);
 
+  if (!apiKey) {
+    throw new Error(`Missing API key for engine: ${engineName}`);
+  }
+
   const response = await fetch(engineUrl, {
     method: "POST",
     headers: {
@@ -165,9 +169,7 @@ function getEngineUrl(engineName: string): string {
 
 function getEngineApiKey(engineName: string): string {
   const envKeys: Record<string, string> = {
-    openai:
-      process.env.OPENAI_API_KEY ||
-      "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",
+    openai: process.env.OPENAI_API_KEY || "",
     anthropic: process.env.ANTHROPIC_API_KEY || "",
     google: process.env.GOOGLE_API_KEY || "",
     xai: process.env.XAI_API_KEY || "",
