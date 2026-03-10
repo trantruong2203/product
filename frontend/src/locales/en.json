@@ -38,6 +38,9 @@
       "domain": "Domain",
       "domainPlaceholder": "https://example.com",
       "country": "Country",
+      "language": "Language",
+      "keywords": "Main Keywords (comma separated)",
+      "keywordsPlaceholder": "e.g. high heels, sneakers, running shoes",
       "cancel": "Cancel",
       "create": "Create"
     }

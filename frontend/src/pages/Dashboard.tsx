@@ -1,16 +1,24 @@
-import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
-import { projectsAPI, resultsAPI } from '../services/api';
-import { Project, ProjectResults } from '../types';
+import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
+import { useTranslation } from "react-i18next";
+import { projectsAPI, resultsAPI } from "../services/api";
+import { Project, ProjectResults } from "../types";
 
 export default function Dashboard() {
   const { t } = useTranslation();
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [newProject, setNewProject] = useState({ domain: '', brandName: '', country: 'US' });
-  const [projectResults, setProjectResults] = useState<Record<string, ProjectResults>>({});
+  const [newProject, setNewProject] = useState({
+    domain: "",
+    brandName: "",
+    country: "VN",
+    language: "vi",
+    keywords: "",
+  });
+  const [projectResults, setProjectResults] = useState<
+    Record<string, ProjectResults>
+  >({});
 
   useEffect(() => {
     loadProjects();
@@ -26,7 +34,7 @@ export default function Dashboard() {
         }
       }
     } catch (error) {
-      console.error('Failed to load projects', error);
+      console.error("Failed to load projects", error);
     } finally {
       setLoading(false);
     }
@@ -36,64 +44,84 @@ export default function Dashboard() {
     try {
       const res = await resultsAPI.getProjectResults(projectId);
       if (res.data.success) {
-        setProjectResults(prev => ({ ...prev, [projectId]: res.data.data }));
+        setProjectResults((prev) => ({ ...prev, [projectId]: res.data.data }));
       }
     } catch (error) {
-      console.error('Failed to load results', error);
+      console.error("Failed to load results", error);
     }
   };
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await projectsAPI.create(newProject);
+      const payload = {
+        ...newProject,
+        keywords: newProject.keywords
+          ? newProject.keywords.split(",").map((k) => k.trim())
+          : [],
+      };
+      const res = await projectsAPI.create(payload);
       if (res.data.success) {
         setProjects([...projects, res.data.data]);
         setShowModal(false);
-        setNewProject({ domain: '', brandName: '', country: 'US' });
+        setNewProject({
+          domain: "",
+          brandName: "",
+          country: "VN",
+          language: "vi",
+          keywords: "",
+        });
       }
     } catch (error) {
-      console.error('Failed to create project', error);
+      console.error("Failed to create project", error);
     }
   };
 
   if (loading) {
-    return <div>{t('app.loading')}</div>;
+    return <div>{t("app.loading")}</div>;
   }
 
   return (
     <div className="dashboard">
       <div className="dashboard-header">
-        <h1>{t('dashboard.title')}</h1>
+        <h1>{t("dashboard.title")}</h1>
         <button onClick={() => setShowModal(true)} className="btn-primary">
-          {t('dashboard.newProject')}
+          {t("dashboard.newProject")}
         </button>
       </div>
 
       {projects.length === 0 ? (
         <div className="empty-state">
-          <p>{t('dashboard.empty')}</p>
+          <p>{t("dashboard.empty")}</p>
         </div>
       ) : (
         <div className="projects-grid">
-          {projects.map(project => {
+          {projects.map((project) => {
             const results = projectResults[project.id];
             return (
-              <Link to={`/project/${project.id}`} key={project.id} className="project-card">
+              <Link
+                to={`/project/${project.id}`}
+                key={project.id}
+                className="project-card"
+              >
                 <h3>{project.brandName}</h3>
                 <p className="domain">{project.domain}</p>
                 <div className="project-stats">
                   <div className="stat">
-                    <span className="stat-value">{results?.visibilityScore || 0}</span>
-                    <span className="stat-label">{t('dashboard.visibility')}</span>
+                    <span className="stat-value">
+                      {results?.visibilityScore || 0}
+                    </span>
+                    <span className="stat-label">
+                      {t("dashboard.visibility")}
+                    </span>
                   </div>
                   <div className="stat">
                     <span className="stat-value">{project._count.prompts}</span>
-                    <span className="stat-label">{t('dashboard.prompts')}</span>
+                    <span className="stat-label">{t("dashboard.prompts")}</span>
                   </div>
                   <div className="stat">
                     <span className="stat-value">{project._count.runs}</span>
-                    <span className="stat-label">{t('dashboard.runs')}</span>
+                    <span className="stat-label">{t("dashboard.runs")}</span>
                   </div>
                 </div>
               </Link>
@@ -104,45 +132,78 @@ export default function Dashboard() {
 
       {showModal && (
         <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h2>{t('dashboard.createProject.title')}</h2>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <h2>{t("dashboard.createProject.title")}</h2>
             <form onSubmit={handleCreateProject}>
               <div className="form-group">
-                <label>{t('dashboard.createProject.brandName')}</label>
+                <label>{t("dashboard.createProject.brandName")}</label>
                 <input
                   type="text"
                   value={newProject.brandName}
-                  onChange={e => setNewProject({ ...newProject, brandName: e.target.value })}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, brandName: e.target.value })
+                  }
                   required
                 />
               </div>
               <div className="form-group">
-                <label>{t('dashboard.createProject.domain')}</label>
+                <label>{t("dashboard.createProject.domain")}</label>
                 <input
                   type="url"
                   value={newProject.domain}
-                  onChange={e => setNewProject({ ...newProject, domain: e.target.value })}
-                  placeholder={t('dashboard.createProject.domainPlaceholder')}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, domain: e.target.value })
+                  }
+                  placeholder={t("dashboard.createProject.domainPlaceholder")}
                   required
                 />
               </div>
               <div className="form-group">
-                <label>{t('dashboard.createProject.country')}</label>
+                <label>{t("dashboard.createProject.country")}</label>
                 <select
                   value={newProject.country}
-                  onChange={e => setNewProject({ ...newProject, country: e.target.value })}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, country: e.target.value })
+                  }
                 >
+                  <option value="VN">Vietnam</option>
                   <option value="US">United States</option>
                   <option value="UK">United Kingdom</option>
-                  <option value="VN">Vietnam</option>
                 </select>
               </div>
+              <div className="form-group">
+                <label>{t("dashboard.createProject.language")}</label>
+                <select
+                  value={newProject.language}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, language: e.target.value })
+                  }
+                >
+                  <option value="vi">Tiếng Việt</option>
+                  <option value="en">English</option>
+                </select>
+              </div>
+              <div className="form-group">
+                <label>{t("dashboard.createProject.keywords")}</label>
+                <input
+                  type="text"
+                  value={newProject.keywords}
+                  onChange={(e) =>
+                    setNewProject({ ...newProject, keywords: e.target.value })
+                  }
+                  placeholder={t("dashboard.createProject.keywordsPlaceholder")}
+                />
+              </div>
               <div className="modal-actions">
-                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">
-                  {t('dashboard.createProject.cancel')}
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  className="btn-secondary"
+                >
+                  {t("dashboard.createProject.cancel")}
                 </button>
                 <button type="submit" className="btn-primary">
-                  {t('dashboard.createProject.create')}
+                  {t("dashboard.createProject.create")}
                 </button>
               </div>
             </form>

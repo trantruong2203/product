@@ -54,6 +54,9 @@ like ChatGPT, Perplexity, Gemini, and Claude to find products or brands.
 
 Rules:
 - Write queries in natural, conversational language (how a real person would ask an AI)
+- PROMPT LANGUAGE: Use the EXACT language requested. If Vietnamese is requested, the queries MUST be in Vietnamese.
+- MARKET CONTEXT: Use local nuances, slang, and search trends specific to the target market/country. 
+- For Vietnamese market: Use phrases like "nên mua", "review thực tế", "so sánh", "chỗ nào bán giá tốt"...
 - Each query must be distinct and cover a different intent
 - Avoid repetition, filler words, and keyword stuffing
 - Return ONLY a valid JSON array, no explanation`;
@@ -91,24 +94,24 @@ Project details:
 - Main keywords / products: ${keywordStr}
 - Known competitors: ${competitorStr}
 - Target market: ${market}
-- Language: ${lang}${descStr}
+- STRICT LANGUAGE REQUIREMENT: ${lang}${descStr}
 
 Required intent coverage (one query per slot):
-1. Brand authority – e.g. "Is [brand] a good brand?"
-2. Brand + primary keyword – commercial intent
-3. Brand + primary keyword – review / trust
+1. Brand authority – e.g. "Is [brand] a good brand?" (Translate/adapt to ${lang})
+2. Brand + primary keyword – commercial intent (How people search in ${market})
+3. Brand + primary keyword – review / trust (Use natural local phrasing)
 4. Comparison vs first competitor
 5. Comparison vs second competitor
 6. Buying guide – no brand mentioned
 7. Problem-solving – specific pain point the product solves
 8. Use-case specific – a concrete scenario
-9. Best-in-category – no brand (measures organic AI visibility)
-10. Purchase intent – where/how to buy
+9. Best-in-category – no brand (measures organic AI visibility in ${market})
+10. Purchase intent – where/how to buy (local stores or platforms in ${market})
 
 Return a JSON array with exactly 10 objects. Each object must have:
 {
   "slot": <number 1-10>,
-  "query": "<the search query in ${lang}>",
+  "query": "<the search query strictly in ${lang}>",
   "intent": "<one of: brand | commercial | informational | comparison | problem-solving>",
   "category": "<short label, e.g. brand-authority | brand-product | comparison | buying-guide | problem-solving | use-case | category-ranking | purchase-intent>"
 }

@@ -3,6 +3,7 @@
  * Usage: npx tsx src/scripts/insertPrompts.ts <projectId> [limit]
  */
 
+import { eq } from 'drizzle-orm';
 import db from '../config/database.js';
 import { prompts } from '../db/schema.js';
 import { generatePrompts, GeneratedPrompt } from './generatePrompts.js';
@@ -43,7 +44,7 @@ export async function insertPrompts(options: InsertPromptsOptions): Promise<numb
   const existingPrompts = await db
     .select({ query: prompts.query })
     .from(prompts)
-    .where(prompts.projectId === projectId);
+    .where(eq(prompts.projectId, projectId));
 
   const existingQueries = new Set(existingPrompts.map(p => p.query.toLowerCase()));
   console.log(`Existing prompts in DB: ${existingQueries.size}`);

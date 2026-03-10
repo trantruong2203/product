@@ -5,10 +5,6 @@
 
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 export interface GeneratedPrompt {
   query: string;
@@ -20,7 +16,15 @@ export interface GeneratedPrompt {
 /**
  * Load seed data from JSON files
  */
-function loadSeedData() {
+interface SeedData {
+  products: string[];
+  brands: string[];
+  competitors: string[];
+  use_cases: string[];
+  problems: string[];
+}
+
+function loadSeedData(): SeedData {
   const dataDir = path.join(__dirname, '..', 'data', 'seeds');
 
   const products = JSON.parse(

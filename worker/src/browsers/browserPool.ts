@@ -29,7 +29,7 @@ export class BrowserPool {
     const context = await chromium.launchPersistentContext(
       path.join(profileDir, engine),
       {
-        channel: "chrome",
+        channel: "chromium",
         headless: false,
 
         viewport: {

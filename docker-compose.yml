@@ -38,11 +38,11 @@ services:
       - "3001:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://neondb_owner:npg_zLW4NjT2vfDo@ep-restless-bread-ajcy9dsh-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      - DATABASE_URL=${DATABASE_URL}
       - JWT_SECRET=${JWT_SECRET:-9cdad47cd84f4fed321d09cc91d0b4cf74b2abced3cd47eef8c49e205cb622ab}
       - JWT_EXPIRES_IN=7d
       - REDIS_URL=redis://redis:6379
-      - FRONTEND_URL=http://localhost:5173
+      - FRONTEND_URL=http://localhost
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,7 +57,7 @@ services:
     container_name: geo-worker
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://neondb_owner:npg_zLW4NjT2vfDo@ep-restless-bread-ajcy9dsh-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require
+      - DATABASE_URL=${DATABASE_URL}
       - REDIS_URL=redis://redis:6379
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     depends_on:

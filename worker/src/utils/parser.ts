@@ -3,13 +3,17 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function normalizeText(text: string): string {
-  return text
-    .replace(/\r/g, "")
-    .replace(/\t/g, " ")
-    .replace(/[^\w\s\n]/g, " ")
-    .replace(/\s+/g, " ")
-    .toLowerCase()
-    .trim();
+  return (
+    text
+      .replace(/\r/g, "")
+      .replace(/\t/g, " ")
+      // Unicode-safe: chỉ xóa punctuation/ký tự đặc biệt, GIỮ LẠI chữ cái đa ngôn ngữ
+      // \p{L} = mọi chữ cái (a-z, tiếng Việt, tiếng Nhật...), \p{N} = số, \s = khoảng trắng
+      .replace(/[^\p{L}\p{N}\s]/gu, " ")
+      .replace(/\s+/g, " ")
+      .toLowerCase()
+      .trim()
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,17 +46,18 @@ export function detectBrandMentions(
 ): Mention[] {
   const mentions: Mention[] = [];
 
-  const normalizedText = normalizeText(text);
-  const lines = normalizedText.split("\n");
+  const rawText = text.replace(/\r/g, "");
+  const originalLines = rawText.split("\n");
   const brand = normalizeText(brandName);
 
   // Only use words long enough to be meaningful
   const brandWords = brand.split(" ").filter((w) => w.length > 2);
 
-  const rankings = extractRankings(normalizedText);
+  const rankings = extractRankings(rawText);
 
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
+  for (let i = 0; i < originalLines.length; i++) {
+    const origLine = originalLines[i];
+    const line = normalizeText(origLine);
     if (!line) continue;
 
     const hasBrandMatch = matchesBrand(line, brand, brandWords);
@@ -73,7 +78,7 @@ export function detectBrandMentions(
       position = rankingMatch.position;
     } else {
       // FIX #6: look for a list item marker in nearby lines only, never guess
-      position = inferPositionFromContext(lines, i);
+      position = inferPositionFromContext(originalLines, i);
     }
 
     const confidence = calculateConfidence(line, brand, brandWords);
@@ -82,7 +87,7 @@ export function detectBrandMentions(
     mentions.push({
       position,
       confidence,
-      context: line,
+      context: origLine,
     });
   }
 
@@ -101,7 +106,10 @@ export function extractRankings(
   text: string,
 ): Array<{ position: number; name: string }> {
   const rankings: Array<{ position: number; name: string }> = [];
-  const numberedPattern = /^(\d+)[.)]\s*([^\n]+)/gm;
+  // MATCHES: "1. Brand", "1) Brand", "[1] Brand", "## 1. Brand", "1️⃣ Brand", etc.
+  // Ignores bold/italic markdown and trailing colons/dashes in the extracted name
+  const numberedPattern =
+    /^(?:#+\s*)?\[?(\d+)[.)\]\uFE0F\u20E3]*\s+(?:[*_]+)?([^\n*_:\-\[]+)/gm;
 
   let match: RegExpExecArray | null;
   while ((match = numberedPattern.exec(text)) !== null) {
@@ -133,7 +141,9 @@ function inferPositionFromContext(
   for (let offset = -1; offset <= 1; offset++) {
     const targetLine = lines[index + offset];
     if (!targetLine) continue;
-    const match = targetLine.match(/^\s*(\d+)[.)]\s/);
+    const match = targetLine.match(
+      /^\s*(?:#+\s*)?\[?(\d+)[.)\]\uFE0F\u20E3]*\s/,
+    );
     if (match) return parseInt(match[1], 10);
   }
   return null;
@@ -144,22 +154,31 @@ function inferPositionFromContext(
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
+ * Unicode-aware word boundary check.
+ * JavaScript's \b does NOT work with Unicode chars like tiếng Việt.
+ * This uses lookahead/lookbehind with \p{L} (letter) flag instead.
+ */
+function wordBoundaryRegex(word: string): RegExp {
+  const escaped = escapeRegex(word);
+  // (?<!\p{L}) = not preceded by a letter
+  // (?!\p{L})  = not followed by a letter
+  return new RegExp(`(?<!\\p{L})${escaped}(?!\\p{L})`, "iu");
+}
+
+/**
  * Returns true if the line contains the brand (whole-word match).
- * Uses word-boundary regex so short brands like "On" don't match "on" everywhere.
+ * Unicode-safe: works with Vietnamese, Japanese, etc.
  */
 function matchesBrand(
   line: string,
   brand: string,
   brandWords: string[],
 ): boolean {
-  const escapedBrand = escapeRegex(brand);
-  if (new RegExp(`\\b${escapedBrand}\\b`).test(line)) return true;
+  if (wordBoundaryRegex(brand).test(line)) return true;
 
-  // Partial match: ALL significant words present as whole words
+  // Partial match: ALL significant words present
   if (brandWords.length > 1) {
-    return brandWords.every((w) =>
-      new RegExp(`\\b${escapeRegex(w)}\\b`).test(line),
-    );
+    return brandWords.every((w) => wordBoundaryRegex(w).test(line));
   }
 
   return false;
@@ -189,21 +208,18 @@ function calculateConfidence(
   brand: string,
   brandWords: string[],
 ): number {
-  const escapedBrand = escapeRegex(brand);
-
-  // Full exact match (word boundary)
-  if (new RegExp(`\\b${escapedBrand}\\b`).test(line)) return 1.0;
+  // Full exact match (Unicode word boundary)
+  if (wordBoundaryRegex(brand).test(line)) return 1.0;
 
   // All significant words present as whole words
   const significantWords = brandWords.filter((w) => w.length > 3);
 
   if (significantWords.length === 0) {
-    // Brand is a single short word — already failed full match above
     return 0.0;
   }
 
   const matchedWords = significantWords.filter((w) =>
-    new RegExp(`\\b${escapeRegex(w)}\\b`).test(line),
+    wordBoundaryRegex(w).test(line),
   );
 
   if (matchedWords.length === significantWords.length) return 0.85;

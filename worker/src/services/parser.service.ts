@@ -1,5 +1,5 @@
-import { normalizeText, detectBrandMentions, detectPosition } from '../utils/parser.js';
-import db, { citations } from '../config/database.js';
+import { detectBrandMentions, type Mention } from "../utils/parser.js";
+import db, { citations } from "../config/database.js";
 
 export interface ParseResponseData {
   responseId: string;
@@ -11,33 +11,45 @@ export interface ParseResponseData {
 }
 
 export async function parseResponse(data: ParseResponseData): Promise<void> {
-  const { responseId, responseText, brandName, domain, competitorNames, competitorDomains } = data;
+  const {
+    responseId,
+    responseText,
+    brandName,
+    domain,
+    competitorNames,
+    competitorDomains,
+  } = data;
 
   console.log(`Parsing response ${responseId} for brand ${brandName}`);
-
-  const normalizedText = normalizeText(responseText);
 
   const allBrands = [
     { name: brandName, domain, isMain: true },
     ...competitorNames.map((name, idx) => ({
       name,
-      domain: competitorDomains[idx] || '',
+      domain: competitorDomains[idx] || "",
       isMain: false,
     })),
   ];
 
   for (const brand of allBrands) {
-    const mentions = detectBrandMentions(normalizedText, brand.name, brand.domain);
+    const mentions: Mention[] = detectBrandMentions(
+      responseText,
+      brand.name,
+      brand.domain,
+    );
     console.log(`Brand: ${brand.name}, mentions found: ${mentions.length}`);
     for (const mention of mentions) {
-      console.log(`  - position: ${mention.position}, confidence: ${mention.confidence}, context: "${mention.context}"`);
+      console.log(
+        `  - position: ${mention.position}, confidence: ${mention.confidence}, context: "${mention.context}"`,
+      );
       await db.insert(citations).values({
         responseId,
         brand: brand.name,
         domain: brand.domain,
         position: mention.position,
         confidence: mention.confidence,
-        context: mention.context,
+        // Save the context but keep it reasonable in length
+        context: mention.context ? mention.context.substring(0, 500) : null,
       });
     }
   }

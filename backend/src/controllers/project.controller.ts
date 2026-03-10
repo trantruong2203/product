@@ -38,6 +38,7 @@ export const createProject = async (
       domain,
       keywords,
       competitors: competitorNames,
+      market: country || "US",
       language: (req.body.language as "en" | "vi") ?? "en",
     });
 

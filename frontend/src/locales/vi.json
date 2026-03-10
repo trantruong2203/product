@@ -38,6 +38,9 @@
       "domain": "Tên miền",
       "domainPlaceholder": "https://vidu.com",
       "country": "Quốc gia",
+      "language": "Ngôn ngữ",
+      "keywords": "Từ khóa chính (cách nhau bởi dấu phẩy)",
+      "keywordsPlaceholder": "ví dụ: giày cao gót, sneaker nam, chạy bộ",
       "cancel": "Hủy",
       "create": "Tạo"
     }

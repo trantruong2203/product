@@ -6,13 +6,17 @@
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsc",
-    "start": "node dist/index.js"
+    "start": "node dist/index.js",
+    "login:chatgpt": "tsx src/scripts/loginChatgpt.ts",
+    "login:gemini": "tsx src/scripts/loginGemini.ts",
+    "login:perplexity": "tsx src/scripts/loginPerplexity.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.3",
     "bullmq": "^5.28.2",
     "dotenv": "^16.4.5",
     "drizzle-orm": "^0.37.0",
+    "node-html-markdown": "^2.0.0",
     "playwright": "^1.49.0",
     "playwright-extra": "^4.3.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2"

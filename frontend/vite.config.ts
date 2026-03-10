@@ -12,5 +12,6 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+    allowedHosts: ['localhost', '127.0.0.1', 'unliberal-astonishingly-karri.ngrok-free.dev', 'localhost:5173'],
   },
 })

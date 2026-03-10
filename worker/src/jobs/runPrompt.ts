@@ -11,6 +11,7 @@ import {
 import { eq } from "drizzle-orm";
 import { getEngine } from "../engines/baseEngine.js";
 import { parseResponse } from "../services/parser.service.js";
+import { htmlToMarkdown } from "../services/markdownConverter.js";
 
 export interface RunPromptJobData {
   runId: string;
@@ -37,17 +38,23 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
     const engine = getEngine(engineName);
     await engine.initialize();
 
-    const responseText = await engine.query(prompt);
+    const { text: responseText, html: responseHtml } =
+      await engine.query(prompt);
+
+    // Convert raw HTML → clean Markdown (preserves Perplexity citations [1][2][3])
+    const responseMarkdown =
+      htmlToMarkdown(responseHtml, engineName) || responseText;
+
     console.log(
-      `Got response for run ${runId}, length: ${responseText.length}`,
+      `Got response for run ${runId}, markdown length: ${responseMarkdown.length}`,
     );
 
     const [response] = await db
       .insert(responses)
       .values({
         runId,
-        responseText,
-        responseHtml: "",
+        responseText: responseMarkdown, // Markdown sạch cho Junior AI đọc
+        responseHtml, // Raw HTML backup để debug
       })
       .returning();
 
@@ -89,7 +96,7 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
 
         await parseResponse({
           responseId: response.id,
-          responseText,
+          responseText: responseMarkdown, // use Markdown which preserves newlines for position detection
           brandName: projectRecord.brandName,
           domain: projectRecord.domain,
           competitorNames,

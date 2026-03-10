@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm --prefix \"E:/product/worker\" run -s build)",
+      "Bash(npx tsc:*)",
+      "Bash(npx --prefix /e/product/worker tsc --noEmit -p /e/product/worker/tsconfig.json)",
+      "Bash(npx --prefix \"E:/product/worker\" tsc --noEmit -p \"E:/product/worker/tsconfig.json\")",
+      "Bash(git -C \"E:/product\" diff -- \"worker/src/scripts/generatePrompts.ts\" \"worker/src/scripts/insertPrompts.ts\")",
+      "Bash(docker compose:*)",
+      "Bash(curl -iS http://localhost:3001/health && curl -iS http://localhost/api/auth/me)",
+      "Bash(curl -iS http://localhost/api/auth/me)"
+    ]
+  }
+}

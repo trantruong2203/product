@@ -194,6 +194,60 @@ Translation files are located in:
 - `GET /api/projects/:projectId/history` - Get historical data
 - `POST /api/runs/trigger` - Trigger analysis run
 
+## Docker
+
+### Prerequisites
+- Docker Desktop (or Docker Engine)
+- Docker Compose plugin (`docker compose`)
+
+### Environment setup
+Create a root `.env` file (same level as `docker-compose.yml`) with at least:
+
+```env
+DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+JWT_SECRET=your-strong-secret
+```
+
+Notes:
+- `REDIS_URL` is already set to `redis://redis:6379` inside compose for internal networking.
+- `FRONTEND_URL` is set to `http://localhost` for Docker runtime.
+
+### Build images
+```bash
+docker compose build
+```
+
+### Start the stack
+```bash
+docker compose up -d
+```
+
+### Status and logs
+```bash
+docker compose ps
+docker compose logs -f api
+docker compose logs -f frontend
+docker compose logs -f worker
+```
+
+### Access URLs
+- Frontend: `http://localhost`
+- API (direct): `http://localhost:3001`
+- Postgres: `localhost:5432`
+- Redis: `localhost:6379`
+
+### Health checks / quick verification
+```bash
+curl http://localhost:3001/health
+curl http://localhost/api/auth/me
+```
+
+### Stop / reset
+```bash
+docker compose down
+docker compose down -v
+```
+
 ## License
 
 MIT License
