@@ -73,6 +73,8 @@ export const resultsAPI = {
   getHistory: (projectId: string, days?: number) =>
     api.get(`/results/${projectId}/history?days=${days || 30}`),
   getCompetitors: (projectId: string) => api.get(`/results/${projectId}/competitors`),
+  getRankings: (projectId: string, engineId?: string) => 
+    api.get(`/results/${projectId}/rankings${engineId ? `?engineId=${engineId}` : ''}`),
 };
 
 export const enginesAPI = {

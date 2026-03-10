@@ -84,3 +84,14 @@ export interface CompetitorComparison {
   domain: string;
   citations: number;
 }
+
+export interface PromptRanking {
+  promptId: string;
+  promptQuery: string;
+  engineId: string;
+  engineName: string;
+  brand: string;
+  rank: number;
+  mentions: number;
+  avgPosition: number;
+}

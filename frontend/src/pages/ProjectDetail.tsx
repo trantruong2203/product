@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { projectsAPI, promptsAPI, competitorsAPI, runsAPI, resultsAPI, enginesAPI } from '../services/api';
-import { Project, Prompt, Competitor, AIEngine, ProjectResults, HistoryData, CompetitorComparison } from '../types';
+import { Project, Prompt, Competitor, AIEngine, ProjectResults, HistoryData, CompetitorComparison, PromptRanking } from '../types';
 
 export default function ProjectDetail() {
   const { t } = useTranslation();
@@ -15,12 +15,15 @@ export default function ProjectDetail() {
   const [results, setResults] = useState<ProjectResults | null>(null);
   const [history, setHistory] = useState<HistoryData[]>([]);
   const [competitorData, setCompetitorData] = useState<CompetitorComparison[]>([]);
+  const [rankings, setRankings] = useState<PromptRanking[]>([]);
   const [loading, setLoading] = useState(true);
   const [showPromptModal, setShowPromptModal] = useState(false);
   const [showCompetitorModal, setShowCompetitorModal] = useState(false);
   const [newPrompt, setNewPrompt] = useState({ query: '', language: 'en' });
   const [newCompetitor, setNewCompetitor] = useState({ name: '', domain: '' });
   const [running, setRunning] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'rankings'>('overview');
+  const [selectedEngine, setSelectedEngine] = useState<string>('');
 
   useEffect(() => {
     if (projectId) loadProjectData();
@@ -113,6 +116,27 @@ export default function ProjectDetail() {
     }
   };
 
+  const loadRankings = async (engineId?: string) => {
+    try {
+      const res = await resultsAPI.getRankings(projectId!, engineId || undefined);
+      if (res.data.success) {
+        setRankings(res.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to load rankings', error);
+    }
+  };
+
+  useEffect(() => {
+    if (projectId) loadProjectData();
+  }, [projectId]);
+
+  useEffect(() => {
+    if (projectId && activeTab === 'rankings') {
+      loadRankings(selectedEngine || undefined);
+    }
+  }, [projectId, activeTab, selectedEngine]);
+
   if (loading) return <div>{t('app.loading')}</div>;
 
   return (
@@ -146,76 +170,149 @@ export default function ProjectDetail() {
         </div>
       </div>
 
-      <div className="charts-section">
-        <div className="chart-card">
-          <h3>{t('project.charts.visibilityTrend')}</h3>
-          {history.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={history}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="date" stroke="#888" />
-                <YAxis stroke="#888" />
-                <Tooltip contentStyle={{ background: '#2a2a2a', border: 'none' }} />
-                <Line type="monotone" dataKey="score" stroke="#646cff" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="no-data">{t('project.charts.noHistory')}</p>
-          )}
-        </div>
-        <div className="chart-card">
-          <h3>{t('project.charts.competitorComparison')}</h3>
-          {competitorData.length > 0 ? (
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={competitorData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#333" />
-                <XAxis dataKey="name" stroke="#888" />
-                <YAxis stroke="#888" />
-                <Tooltip contentStyle={{ background: '#2a2a2a', border: 'none' }} />
-                <Bar dataKey="citations" fill="#646cff" />
-              </BarChart>
-            </ResponsiveContainer>
-          ) : (
-            <p className="no-data">{t('project.charts.noCompetitorData')}</p>
-          )}
-        </div>
+      <div className="tabs">
+        <button 
+          className={`tab ${activeTab === 'overview' ? 'active' : ''}`}
+          onClick={() => setActiveTab('overview')}
+        >
+          Overview
+        </button>
+        <button 
+          className={`tab ${activeTab === 'rankings' ? 'active' : ''}`}
+          onClick={() => setActiveTab('rankings')}
+        >
+          Prompt Rankings
+        </button>
       </div>
 
-      <div className="tables-section">
-        <div className="table-card">
-          <div className="table-header">
-            <h3>{t('project.prompts.title')} ({prompts.length})</h3>
-            <button onClick={() => setShowPromptModal(true)} className="btn-small">{t('project.prompts.add')}</button>
+      {activeTab === 'overview' && (
+        <div className="tab-content">
+          <div className="charts-section">
+            <div className="chart-card">
+              <h3>{t('project.charts.visibilityTrend')}</h3>
+              {history.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={history}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="date" stroke="#888" />
+                    <YAxis stroke="#888" />
+                    <Tooltip contentStyle={{ background: '#2a2a2a', border: 'none' }} />
+                    <Line type="monotone" dataKey="score" stroke="#646cff" strokeWidth={2} />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="no-data">{t('project.charts.noHistory')}</p>
+              )}
+            </div>
+            <div className="chart-card">
+              <h3>{t('project.charts.competitorComparison')}</h3>
+              {competitorData.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={competitorData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#333" />
+                    <XAxis dataKey="name" stroke="#888" />
+                    <YAxis stroke="#888" />
+                    <Tooltip contentStyle={{ background: '#2a2a2a', border: 'none' }} />
+                    <Bar dataKey="citations" fill="#646cff" />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="no-data">{t('project.charts.noCompetitorData')}</p>
+              )}
+            </div>
           </div>
-          <div className="table-list">
-            {prompts.map(prompt => (
-              <div key={prompt.id} className="table-row">
-                <span className="query">{prompt.query}</span>
-                <button onClick={() => handleDeletePrompt(prompt.id)} className="btn-delete">{t('project.prompts.delete')}</button>
+
+          <div className="tables-section">
+            <div className="table-card">
+              <div className="table-header">
+                <h3>{t('project.prompts.title')} ({prompts.length})</h3>
+                <button onClick={() => setShowPromptModal(true)} className="btn-small">{t('project.prompts.add')}</button>
               </div>
-            ))}
-            {prompts.length === 0 && <p className="empty">{t('project.prompts.empty')}</p>}
+              <div className="table-list">
+                {prompts.map(prompt => (
+                  <div key={prompt.id} className="table-row">
+                    <span className="query">{prompt.query}</span>
+                    <button onClick={() => handleDeletePrompt(prompt.id)} className="btn-delete">{t('project.prompts.delete')}</button>
+                  </div>
+                ))}
+                {prompts.length === 0 && <p className="empty">{t('project.prompts.empty')}</p>}
+              </div>
+            </div>
+            <div className="table-card">
+              <div className="table-header">
+                <h3>{t('project.competitors.title')} ({competitors.length})</h3>
+                <button onClick={() => setShowCompetitorModal(true)} className="btn-small">{t('project.competitors.add')}</button>
+              </div>
+              <div className="table-list">
+                {competitors.map(comp => (
+                  <div key={comp.id} className="table-row">
+                    <div>
+                      <div className="name">{comp.name}</div>
+                      <div className="domain">{comp.domain}</div>
+                    </div>
+                    <button onClick={() => handleDeleteCompetitor(comp.id)} className="btn-delete">{t('project.competitors.delete')}</button>
+                  </div>
+                ))}
+                {competitors.length === 0 && <p className="empty">{t('project.competitors.empty')}</p>}
+              </div>
+            </div>
           </div>
         </div>
-        <div className="table-card">
-          <div className="table-header">
-            <h3>{t('project.competitors.title')} ({competitors.length})</h3>
-            <button onClick={() => setShowCompetitorModal(true)} className="btn-small">{t('project.competitors.add')}</button>
+      )}
+
+      {activeTab === 'rankings' && (
+        <div className="tab-content">
+          <div className="rankings-header">
+            <div className="filter-group">
+              <label>Engine:</label>
+              <select 
+                value={selectedEngine} 
+                onChange={(e) => setSelectedEngine(e.target.value)}
+              >
+                <option value="">All Engines</option>
+                {engines.map(engine => (
+                  <option key={engine.id} value={engine.id}>{engine.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
-          <div className="table-list">
-            {competitors.map(comp => (
-              <div key={comp.id} className="table-row">
-                <div>
-                  <div className="name">{comp.name}</div>
-                  <div className="domain">{comp.domain}</div>
-                </div>
-                <button onClick={() => handleDeleteCompetitor(comp.id)} className="btn-delete">{t('project.competitors.delete')}</button>
-              </div>
-            ))}
-            {competitors.length === 0 && <p className="empty">{t('project.competitors.empty')}</p>}
-          </div>
+
+          {rankings.length > 0 ? (
+            <div className="rankings-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Prompt</th>
+                    <th>Engine</th>
+                    <th>Rank</th>
+                    <th>Brand</th>
+                    <th>Mentions</th>
+                    <th>Avg Position</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {rankings.map((ranking, idx) => (
+                    <tr key={`${ranking.promptId}-${ranking.engineId}-${ranking.brand}-${idx}`}>
+                      <td className="prompt-cell">{ranking.promptQuery}</td>
+                      <td>{ranking.engineName}</td>
+                      <td>
+                        <span className={`rank rank-${ranking.rank <= 3 ? ranking.rank : 'other'}`}>
+                          {ranking.rank}
+                        </span>
+                      </td>
+                      <td>{ranking.brand}</td>
+                      <td>{ranking.mentions}</td>
+                      <td>{ranking.avgPosition}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="no-data">No ranking data available. Run analysis to see results.</p>
+          )}
         </div>
-      </div>
+      )}
 
       {showPromptModal && (
         <div className="modal-overlay" onClick={() => setShowPromptModal(false)}>
@@ -316,6 +413,27 @@ export default function ProjectDetail() {
         .form-group label { display: block; margin-bottom: 0.5rem; color: #ccc; }
         .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #444; border-radius: 4px; background: #1a1a1a; color: #fff; box-sizing: border-box; }
         .modal-actions { display: flex; gap: 1rem; justify-content: flex-end; margin-top: 1.5rem; }
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; border-bottom: 1px solid #333; }
+        .tab { padding: 0.75rem 1.5rem; background: transparent; color: #888; border: none; border-bottom: 2px solid transparent; cursor: pointer; font-size: 1rem; transition: all 0.2s; }
+        .tab:hover { color: #fff; }
+        .tab.active { color: #646cff; border-bottom-color: #646cff; }
+        .tab-content { animation: fadeIn 0.3s ease; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .rankings-header { margin-bottom: 1rem; }
+        .filter-group { display: flex; align-items: center; gap: 0.5rem; }
+        .filter-group label { color: #888; }
+        .filter-group select { padding: 0.5rem; background: #1a1a1a; color: #fff; border: 1px solid #444; border-radius: 4px; }
+        .rankings-table { background: #2a2a2a; border-radius: 8px; overflow: hidden; }
+        .rankings-table table { width: 100%; border-collapse: collapse; }
+        .rankings-table th { padding: 1rem; text-align: left; color: #888; font-weight: 500; border-bottom: 1px solid #333; }
+        .rankings-table td { padding: 1rem; color: #ccc; border-bottom: 1px solid #333; }
+        .rankings-table tr:last-child td { border-bottom: none; }
+        .rankings-table .prompt-cell { max-width: 300px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .rank { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-weight: bold; }
+        .rank-1 { background: #ffd700; color: #000; }
+        .rank-2 { background: #c0c0c0; color: #000; }
+        .rank-3 { background: #cd7f32; color: #000; }
+        .rank-other { background: #444; color: #fff; }
       `}</style>
     </div>
   );

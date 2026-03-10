@@ -7,5 +7,6 @@ const router = Router();
 router.get('/:projectId', authenticate, resultController.getProjectResults);
 router.get('/:projectId/history', authenticate, resultController.getProjectHistory);
 router.get('/:projectId/competitors', authenticate, resultController.getCompetitorComparison);
+router.get('/:projectId/rankings', authenticate, resultController.getPromptRankings);
 
 export default router;

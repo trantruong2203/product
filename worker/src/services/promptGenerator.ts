@@ -1,18 +1,30 @@
 /**
- * Project-specific prompt generator
- * Generates 100 SEO prompts tailored to each project's domain, brandName, and keywords
+ * High-quality GEO prompt generator
+ *
+ * Strategy: 10 focused prompts per run, covering the highest-signal intent categories.
+ * Distribution (fixed slots, no bloat):
+ *
+ *  Slot 1   – Brand authority (direct brand query)
+ *  Slot 2   – Brand + primary keyword (commercial)
+ *  Slot 3   – Brand review / trustworthiness
+ *  Slot 4   – Competitor comparison #1
+ *  Slot 5   – Competitor comparison #2
+ *  Slot 6   – Informational / buying guide
+ *  Slot 7   – Problem-solving (pain point)
+ *  Slot 8   – Use-case specific (category)
+ *  Slot 9   – Best-in-category (generic, no brand)
+ *  Slot 10  – Long-tail high-intent (price / where to buy)
  */
 
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
 export interface GeneratedPrompt {
+  slot: number;
   query: string;
-  intent: 'commercial' | 'informational' | 'comparison' | 'problem-solving';
+  intent:
+    | "brand"
+    | "commercial"
+    | "informational"
+    | "comparison"
+    | "problem-solving";
   category: string;
   language: string;
 }
@@ -21,232 +33,187 @@ export interface ProjectPromptOptions {
   domain: string;
   brandName: string;
   keywords: string[];
-  language?: string;
+  /** Top competitors to compare against. First 2 are used for comparison slots. */
+  competitors?: string[];
+  language?: "en" | "vi";
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Fallback data (used when project has no keywords / competitors configured)
+// ─────────────────────────────────────────────────────────────────────────────
+
+const FALLBACK_KEYWORDS = ["shoes", "sneakers", "footwear"];
+
+const FALLBACK_COMPETITORS = ["Nike", "Adidas", "Puma"];
+
+const FALLBACK_USECASE = "everyday use";
+
+const FALLBACK_PROBLEM = "foot pain";
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Template definitions per slot
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface SlotTemplate {
+  en: string;
+  vi: string;
+  intent: GeneratedPrompt["intent"];
+  category: string;
+}
+
+const SLOT_TEMPLATES: SlotTemplate[] = [
+  // Slot 1 – Brand authority
+  {
+    en: "Is {brand} a good brand?",
+    vi: "{brand} có phải thương hiệu tốt không?",
+    intent: "brand",
+    category: "brand-authority",
+  },
+
+  // Slot 2 – Brand + primary keyword (commercial)
+  {
+    en: "Best {brand} {keyword}",
+    vi: "{keyword} tốt nhất của {brand}",
+    intent: "commercial",
+    category: "brand-product",
+  },
+
+  // Slot 3 – Brand review
+  {
+    en: "{brand} {keyword} review",
+    vi: "Đánh giá {keyword} {brand}",
+    intent: "informational",
+    category: "brand-review",
+  },
+
+  // Slot 4 – Competitor comparison #1
+  {
+    en: "{brand} vs {competitor1} – which is better?",
+    vi: "{brand} hay {competitor1} tốt hơn?",
+    intent: "comparison",
+    category: "comparison",
+  },
+
+  // Slot 5 – Competitor comparison #2
+  {
+    en: "{brand} compared to {competitor2}",
+    vi: "So sánh {brand} và {competitor2}",
+    intent: "comparison",
+    category: "comparison",
+  },
+
+  // Slot 6 – Informational / buying guide
+  {
+    en: "How to choose the best {keyword}",
+    vi: "Cách chọn {keyword} tốt nhất",
+    intent: "informational",
+    category: "buying-guide",
+  },
+
+  // Slot 7 – Problem-solving
+  {
+    en: "Best {keyword} for {problem}",
+    vi: "{keyword} tốt nhất cho người bị {problem}",
+    intent: "problem-solving",
+    category: "problem-solving",
+  },
+
+  // Slot 8 – Use-case specific
+  {
+    en: "Best {keyword} for {usecase}",
+    vi: "{keyword} tốt nhất cho {usecase}",
+    intent: "commercial",
+    category: "use-case",
+  },
+
+  // Slot 9 – Best in category (no brand – measures organic visibility)
+  {
+    en: "Top {keyword} brands in {currentYear}",
+    vi: "Các thương hiệu {keyword} tốt nhất năm {currentYear}",
+    intent: "informational",
+    category: "category-ranking",
+  },
+
+  // Slot 10 – Long-tail high-intent (purchase signal)
+  {
+    en: "Where to buy {brand} {keyword} online",
+    vi: "Mua {keyword} {brand} chính hãng ở đâu?",
+    intent: "commercial",
+    category: "purchase-intent",
+  },
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Core generator
+// ─────────────────────────────────────────────────────────────────────────────
+
 /**
- * Load default seed data for fallbacks
+ * Generate exactly 10 high-quality, slot-based GEO prompts for a project.
  */
-function loadSeedData() {
-  const dataDir = path.join(__dirname, '..', 'data', 'seeds');
+export function generateProjectPrompts(
+  options: ProjectPromptOptions,
+): GeneratedPrompt[] {
+  const { brandName, keywords, competitors = [], language = "en" } = options;
 
-  const products = JSON.parse(
-    fs.readFileSync(path.join(dataDir, 'products.json'), 'utf-8')
-  ).products;
+  // Resolve effective values with fallbacks
+  const primaryKeyword = keywords[0] ?? FALLBACK_KEYWORDS[0];
+  const usecase = keywords[1] ?? FALLBACK_USECASE;
+  const problem = keywords[2] ?? FALLBACK_PROBLEM;
+  const competitor1 =
+    competitors[0] ??
+    FALLBACK_COMPETITORS.find(
+      (c) => c.toLowerCase() !== brandName.toLowerCase(),
+    ) ??
+    FALLBACK_COMPETITORS[0];
+  const competitor2 =
+    competitors[1] ??
+    FALLBACK_COMPETITORS.find(
+      (c) => c.toLowerCase() !== brandName.toLowerCase() && c !== competitor1,
+    ) ??
+    FALLBACK_COMPETITORS[1];
+  const currentYear = new Date().getFullYear().toString();
 
-  const useCasesData = JSON.parse(
-    fs.readFileSync(path.join(dataDir, 'useCases.json'), 'utf-8')
-  );
-
-  const brandsData = JSON.parse(
-    fs.readFileSync(path.join(dataDir, 'brands.json'), 'utf-8')
-  );
-
-  return {
-    products,
-    use_cases: useCasesData.use_cases,
-    problems: useCasesData.problems,
-    competitors: brandsData.competitors,
+  const vars: Record<string, string> = {
+    brand: brandName,
+    keyword: primaryKeyword,
+    usecase,
+    problem,
+    competitor1,
+    competitor2,
+    currentYear,
   };
+
+  const results: GeneratedPrompt[] = SLOT_TEMPLATES.map((tpl, index) => {
+    const template = language === "vi" ? tpl.vi : tpl.en;
+    const query = fillTemplate(template, vars);
+
+    return {
+      slot: index + 1,
+      query,
+      intent: tpl.intent,
+      category: tpl.category,
+      language,
+    };
+  });
+
+  return results;
 }
 
 /**
- * Normalize text for deduplication
+ * Return only the query strings (used by the job queue).
  */
-function normalize(text: string): string {
-  return text
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+export function generateProjectPromptQueries(
+  options: ProjectPromptOptions,
+): string[] {
+  return generateProjectPrompts(options).map((p) => p.query);
 }
 
-/**
- * Generate 100 SEO prompts for a specific project
- * Distribution:
- * - 30 prompts: brandName + products (commercial)
- * - 30 prompts: keywords + use_cases (commercial)
- * - 20 prompts: comparison (brandName vs competitors)
- * - 20 prompts: informational/review
- */
-export function generateProjectPrompts(options: ProjectPromptOptions): GeneratedPrompt[] {
-  const { domain, brandName, keywords, language = 'en' } = options;
-  const results: GeneratedPrompt[] = [];
-  const seen = new Set<string>();
+// ─────────────────────────────────────────────────────────────────────────────
+// Helpers
+// ─────────────────────────────────────────────────────────────────────────────
 
-  const data = loadSeedData();
-
-  // Use provided keywords or fallbacks
-  const effectiveKeywords = keywords.length > 0 ? keywords : data.products;
-  const effectiveUseCases = data.use_cases;
-  const effectiveProducts = data.products;
-  const effectiveCompetitors = data.competitors;
-
-  // Helper: add prompt if not duplicate
-  function addPrompt(query: string, intent: GeneratedPrompt['intent'], category: string) {
-    const key = normalize(query);
-    if (!seen.has(key)) {
-      seen.add(key);
-      results.push({
-        query,
-        intent,
-        category,
-        language,
-      });
-      return true;
-    }
-    return false;
-  }
-
-  // ============================================
-  // Part 1: 30 prompts - brandName + products (commercial)
-  // ============================================
-  const brandProductTemplates = [
-    `best {brand} {product}`,
-    `{brand} {product} review`,
-    `top rated {brand} {product}`,
-    `buy {brand} {product} online`,
-    `{brand} {product} for beginners`,
-    `best {brand} {product} 2024`,
-    `{brand} {product} price`,
-    `{brand} {product} discount`,
-    `{brand} {product} sale`,
-    `authentic {brand} {product}`,
-    `{brand} {product} official store`,
-    `best selling {brand} {product}`,
-    `{brand} {product} for running`,
-    `{brand} {product} for training`,
-    `premium {brand} {product}`,
-  ];
-
-  let brandPromptCount = 0;
-  for (const template of brandProductTemplates) {
-    if (brandPromptCount >= 30) break;
-    for (const product of effectiveProducts) {
-      if (brandPromptCount >= 30) break;
-      const query = template.replace('{brand}', brandName).replace('{product}', product);
-      if (addPrompt(query, 'commercial', 'brand-product')) {
-        brandPromptCount++;
-      }
-    }
-  }
-
-  // ============================================
-  // Part 2: 30 prompts - keywords + use_cases (commercial)
-  // ============================================
-  const keywordUseCaseTemplates = [
-    `best {keyword} for {usecase}`,
-    `{keyword} for {usecase}`,
-    `top {keyword} for {usecase}`,
-    `{keyword} {usecase} review`,
-    `buy {keyword} for {usecase}`,
-    `{keyword} for beginners {usecase}`,
-    `best {keyword} 2024 for {usecase}`,
-    `{keyword} price for {usecase}`,
-  ];
-
-  let keywordPromptCount = 0;
-  for (const template of keywordUseCaseTemplates) {
-    if (keywordPromptCount >= 30) break;
-    for (const keyword of effectiveKeywords.slice(0, 10)) {
-      if (keywordPromptCount >= 30) break;
-      for (const usecase of effectiveUseCases.slice(0, 5)) {
-        if (keywordPromptCount >= 30) break;
-        const query = template.replace('{keyword}', keyword).replace('{usecase}', usecase);
-        if (addPrompt(query, 'commercial', 'keyword-usecase')) {
-          keywordPromptCount++;
-        }
-      }
-    }
-  }
-
-  // ============================================
-  // Part 3: 20 prompts - comparison (brandName vs competitors)
-  // ============================================
-  const comparisonTemplates = [
-    `{brand} vs {competitor}`,
-    `{brand} or {competitor} which is better`,
-    `{brand} compared to {competitor}`,
-    `{brand} vs {competitor} review`,
-    `{brand} or {competitor} for running`,
-    `{brand} vs {competitor} price`,
-    `{brand} {competitor} difference`,
-    `{brand} {competitor} comparison`,
-  ];
-
-  let comparisonCount = 0;
-  for (const template of comparisonTemplates) {
-    if (comparisonCount >= 20) break;
-    for (const competitor of effectiveCompetitors) {
-      if (comparisonCount >= 20) break;
-      const query = template.replace('{brand}', brandName).replace('{competitor}', competitor);
-      if (addPrompt(query, 'comparison', 'comparison')) {
-        comparisonCount++;
-      }
-    }
-  }
-
-  // ============================================
-  // Part 4: 20 prompts - informational/review
-  // ============================================
-  const informationalTemplates = [
-    `how to choose {keyword}`,
-    `{keyword} buying guide`,
-    `{keyword} features`,
-    `what is the best {keyword}`,
-    `{keyword} pros and cons`,
-    `{keyword} specifications`,
-    `{keyword} vs similar products`,
-    `{keyword} customer review`,
-    `{keyword} rating`,
-    `{keyword} best price`,
-  ];
-
-  let infoCount = 0;
-  for (const template of informationalTemplates) {
-    if (infoCount >= 20) break;
-    for (const keyword of effectiveKeywords.slice(0, 10)) {
-      if (infoCount >= 20) break;
-      const query = template.replace('{keyword}', keyword);
-      if (addPrompt(query, 'informational', 'informational')) {
-        infoCount++;
-      }
-    }
-  }
-
-  // If we don't have 100 prompts yet, add more generic prompts
-  const additionalTemplates = [
-    `best {product}`,
-    `{product} review`,
-    `top {product}`,
-    `{product} for women`,
-    `{product} for men`,
-    `{product} size guide`,
-    `{product} warranty`,
-    `{product} return policy`,
-  ];
-
-  let additionalCount = 0;
-  while (results.length < 100) {
-    const template = additionalTemplates[additionalCount % additionalTemplates.length];
-    const product = effectiveProducts[additionalCount % effectiveProducts.length];
-    const query = template.replace('{product}', product);
-    if (addPrompt(query, 'commercial', 'additional')) {
-      // Only increment if actually added (not duplicate)
-    }
-    additionalCount++;
-    if (additionalCount > 500) break; // Safety limit
-  }
-
-  // Trim to exactly 100 prompts
-  return results.slice(0, 100);
-}
-
-/**
- * Generate prompts and return just the query strings
- */
-export function generateProjectPromptQueries(options: ProjectPromptOptions): string[] {
-  return generateProjectPrompts(options).map(p => p.query);
+function fillTemplate(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key) => vars[key] ?? `{${key}}`);
 }
 
 export default generateProjectPrompts;

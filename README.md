@@ -50,8 +50,9 @@ A SaaS platform for tracking and analyzing AI search visibility. GEO (Generative
 ├── worker/                 # Background job processor
 └── README.md              # This file
 ```
+f
 
-## Prerequisites
+
 
 - Node.js 18+
 - npm or yarn
