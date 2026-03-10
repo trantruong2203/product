@@ -6,7 +6,6 @@ import {
   projects,
   competitors,
   responses,
-  citations,
 } from "../db/schema.js";
 import { eq } from "drizzle-orm";
 import { getEngine } from "../engines/baseEngine.js";
@@ -21,7 +20,7 @@ export interface RunPromptJobData {
 }
 
 export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
-  const { runId, promptId, engineId, prompt, engineName } = job.data;
+  const { runId, promptId, prompt, engineName } = job.data;
 
   console.log(`Processing run ${runId} for engine ${engineName}`);
 
@@ -34,8 +33,27 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
       })
       .where(eq(runs.id, runId));
 
+    const promptData = await db
+      .select()
+      .from(prompts)
+      .where(eq(prompts.id, promptId));
+
+    const promptRecord = promptData[0];
+
+    const projectRecord = promptRecord
+      ? (
+          await db
+            .select()
+            .from(projects)
+            .where(eq(projects.id, promptRecord.projectId))
+        )[0]
+      : undefined;
+
     const engine = getEngine(engineName);
-    await engine.initialize();
+    await engine.initialize({
+      country: projectRecord?.country,
+      language: promptRecord?.language,
+    });
 
     const responseText = await engine.query(prompt);
     console.log(
@@ -59,43 +77,27 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
       })
       .where(eq(runs.id, runId));
 
-    const promptData = await db
-      .select()
-      .from(prompts)
-      .where(eq(prompts.id, promptId));
-
-    const promptRecord = promptData[0];
-
-    if (promptRecord) {
-      const projectData = await db
+    if (promptRecord && projectRecord) {
+      const competitorsData = await db
         .select()
-        .from(projects)
-        .where(eq(projects.id, promptRecord.projectId));
+        .from(competitors)
+        .where(eq(competitors.projectId, projectRecord.id));
 
-      const projectRecord = projectData[0];
+      const competitorNames = competitorsData.map(
+        (c: { name: string }) => c.name,
+      );
+      const competitorDomains = competitorsData.map(
+        (c: { domain: string }) => c.domain,
+      );
 
-      if (projectRecord) {
-        const competitorsData = await db
-          .select()
-          .from(competitors)
-          .where(eq(competitors.projectId, projectRecord.id));
-
-        const competitorNames = competitorsData.map(
-          (c: { name: string }) => c.name,
-        );
-        const competitorDomains = competitorsData.map(
-          (c: { domain: string }) => c.domain,
-        );
-
-        await parseResponse({
-          responseId: response.id,
-          responseText,
-          brandName: projectRecord.brandName,
-          domain: projectRecord.domain,
-          competitorNames,
-          competitorDomains,
-        });
-      }
+      await parseResponse({
+        responseId: response.id,
+        responseText,
+        brandName: projectRecord.brandName,
+        domain: projectRecord.domain,
+        competitorNames,
+        competitorDomains,
+      });
     }
 
     await engine.cleanup();

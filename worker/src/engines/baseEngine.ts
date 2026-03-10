@@ -1,5 +1,6 @@
 import { Page, BrowserContext } from "playwright";
 import { browserPool } from "../browsers/browserPool.js";
+import { GeoContextOptions, resolveGeoContextOptions } from "../utils/geo.js";
 
 export interface EngineConfig {
   name: string;
@@ -62,9 +63,11 @@ export class BaseEngine {
 
   }
 
-  async initialize(): Promise<void> {
+  async initialize(geo?: GeoContextOptions): Promise<void> {
 
-    this.context = await browserPool.getContext(this.config.name);
+    const resolvedGeo = resolveGeoContextOptions(geo);
+
+    this.context = await browserPool.getContext(this.config.name, geo);
 
     this.page = await this.context.newPage();
 
@@ -74,7 +77,7 @@ export class BaseEngine {
     });
 
     await this.page.setExtraHTTPHeaders({
-      "Accept-Language": "en-US,en;q=0.9"
+      "Accept-Language": resolvedGeo.acceptLanguageHeader,
     });
 
   }

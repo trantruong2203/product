@@ -1,8 +1,9 @@
-import { BrowserContext } from "playwright";
+import { Browser, BrowserContext } from "playwright";
 import { chromium } from "playwright-extra";
 import StealthPlugin from "puppeteer-extra-plugin-stealth";
 import * as path from "path";
 import * as fs from "fs";
+import { GeoContextOptions, resolveGeoContextOptions } from "../utils/geo.js";
 
 chromium.use(StealthPlugin());
 
@@ -12,70 +13,146 @@ if (!fs.existsSync(profileDir)) {
   fs.mkdirSync(profileDir, { recursive: true });
 }
 
+function cleanupChromeLockFiles(engineProfilePath: string) {
+  const lockFiles = [
+    "SingletonLock",
+    "SingletonSocket",
+    "SingletonCookie"
+  ];
+
+  for (const lockFile of lockFiles) {
+    const lockPath = path.join(engineProfilePath, lockFile);
+    try {
+      if (fs.existsSync(lockPath)) {
+        fs.unlinkSync(lockPath);
+      }
+    } catch {}
+  }
+}
+
 export class BrowserPool {
 
+  private browser?: Browser;
   private contexts: Map<string, BrowserContext> = new Map();
 
-  async getContext(engine: string): Promise<BrowserContext> {
+  private async ensureBrowser(): Promise<Browser> {
+    if (this.browser && this.browser.isConnected()) {
+      return this.browser;
+    }
+
+    console.log("Launching browser...");
+
+    this.browser = await chromium.launch({
+      channel: "chrome",
+      executablePath: process.env.CHROME_PATH || "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+      headless: false,
+
+      args: [
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-dev-shm-usage"
+      ]
+    });
+
+    this.browser.on("disconnected", () => {
+      console.log("Browser disconnected");
+      this.browser = undefined;
+    });
+
+    return this.browser;
+  }
+
+  async getContext(
+    engine: string,
+    geo?: GeoContextOptions
+  ): Promise<BrowserContext> {
 
     engine = engine.toLowerCase();
 
-    if (this.contexts.has(engine)) {
-      return this.contexts.get(engine)!;
+    const resolvedGeo = resolveGeoContextOptions(geo);
+    const contextKey = [
+      engine,
+      resolvedGeo.locale,
+      resolvedGeo.timezoneId || "",
+      resolvedGeo.geolocation ? `${resolvedGeo.geolocation.latitude},${resolvedGeo.geolocation.longitude}` : "",
+    ].join("|");
+
+    const existingContext = this.contexts.get(contextKey);
+    if (existingContext) {
+      const b = existingContext.browser();
+      if (b && b.isConnected()) {
+        return existingContext;
+      }
+      this.contexts.delete(contextKey);
     }
 
-    console.log(`Launching persistent browser for ${engine}`);
+    console.log(`Creating context for ${engine} (${resolvedGeo.locale})`);
 
-    const context = await chromium.launchPersistentContext(
-      path.join(profileDir, engine),
-      {
-        channel: "chrome",
-        headless: false,
+    const browser = await this.ensureBrowser();
+    const engineProfilePath = path.join(profileDir, engine);
+    cleanupChromeLockFiles(engineProfilePath);
 
-        viewport: {
-          width: 1280,
-          height: 800
-        },
+    const context = await browser.newContext({
+      // @ts-ignore - userDataDir is valid but not in types
+      userDataDir: engineProfilePath,
 
-        locale: "en-US",
+      viewport: {
+        width: 1280,
+        height: 800
+      },
 
-        userAgent:
-          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
+      locale: resolvedGeo.locale,
+      timezoneId: resolvedGeo.timezoneId,
+      geolocation: resolvedGeo.geolocation,
+      permissions: resolvedGeo.geolocation ? ["geolocation"] : [],
 
-        args: [
-          "--disable-blink-features=AutomationControlled",
-          "--no-sandbox",
-          "--disable-dev-shm-usage"
-        ]
-      }
-    );
+      userAgent:
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/122 Safari/537.36",
 
-    this.contexts.set(engine, context);
+      args: [
+        "--disable-blink-features=AutomationControlled",
+        "--no-sandbox",
+        "--disable-dev-shm-usage"
+      ]
+    });
+
+    this.contexts.set(contextKey, context);
 
     return context;
   }
 
   async closeContext(engine: string) {
-
     engine = engine.toLowerCase();
 
-    const context = this.contexts.get(engine);
+    const keysToClose = Array.from(this.contexts.keys()).filter(
+      (k) => k === engine || k.startsWith(`${engine}|`),
+    );
 
-    if (!context) return;
+    if (!keysToClose.length) return;
 
-    await context.close();
+    for (const key of keysToClose) {
+      const ctx = this.contexts.get(key);
+      if (!ctx) continue;
+      await ctx.close();
+      this.contexts.delete(key);
+    }
 
-    this.contexts.delete(engine);
-
-    console.log(`Closed browser for ${engine}`);
+    console.log(`Closed contexts for ${engine}`);
   }
 
   async closeAll() {
 
-    for (const engine of this.contexts.keys()) {
+    const keys = Array.from(this.contexts.keys());
+    for (const key of keys) {
+      const ctx = this.contexts.get(key);
+      if (!ctx) continue;
+      await ctx.close();
+      this.contexts.delete(key);
+    }
 
-      await this.closeContext(engine);
-
+    if (this.browser) {
+      await this.browser.close();
+      this.browser = undefined;
     }
 
   }
