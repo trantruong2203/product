@@ -14,4 +14,9 @@ export default defineConfig({
     },
     allowedHosts: ['localhost', '127.0.0.1', 'unliberal-astonishingly-karri.ngrok-free.dev', 'localhost:5173'],
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+  },
 })
