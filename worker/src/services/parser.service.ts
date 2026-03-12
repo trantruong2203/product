@@ -132,8 +132,9 @@ export async function parseResponse(data: ParseResponseData): Promise<void> {
 
   const allRows = mentionRows.concat(orphanLinkRows);
 
-  for (const row of allRows) {
-    await db.insert(citations).values(row);
+  // Batch insert all citations at once for better performance
+  if (allRows.length > 0) {
+    await db.insert(citations).values(allRows);
   }
 
   console.log(
@@ -193,7 +194,7 @@ function buildMentionCitations(
   return rows;
 }
 
-async function buildOrphanLinkCitations(
+function buildOrphanLinkCitations(
   responseId: string,
   responseText: string,
   brandName: string,
@@ -270,6 +271,7 @@ function resolveLinkMetadata(
 /**
  * Perform HTTP HEAD check for all citations of a given response
  * and update isValid + httpStatus in the database.
+ * Optimized with batch updates and controlled concurrency.
  */
 async function validateCitationLinks(responseId: string): Promise<void> {
   const rows = await db
@@ -277,10 +279,20 @@ async function validateCitationLinks(responseId: string): Promise<void> {
     .from(citations)
     .where(eq(citations.responseId, responseId));
 
-  await Promise.all(
-    rows
-      .filter((r) => r.url)
-      .map(async (row) => {
+  const urlRows = rows.filter((r) => r.url);
+  
+  if (urlRows.length === 0) {
+    console.log(`No URLs to validate for response ${responseId}`);
+    return;
+  }
+
+  // Validate in batches of 10 to avoid overwhelming the network
+  const BATCH_SIZE = 10;
+  for (let i = 0; i < urlRows.length; i += BATCH_SIZE) {
+    const batch = urlRows.slice(i, i + BATCH_SIZE);
+    
+    await Promise.all(
+      batch.map(async (row) => {
         let httpStatus: number | null = null;
         let isValid = false;
 
@@ -306,9 +318,10 @@ async function validateCitationLinks(responseId: string): Promise<void> {
           .set({ isValid, httpStatus })
           .where(eq(citations.id, row.id));
       }),
-  );
+    );
+  }
 
   console.log(
-    `Validated links for response ${responseId}: ${rows.filter((r) => r.url).length} URLs checked`,
+    `Validated links for response ${responseId}: ${urlRows.length} URLs checked`,
   );
 }

@@ -56,7 +56,8 @@
       "Bash(grep -r \"Content Gap\\\\|structured table\\\\|schema mark\" --include=*.ts --include=*.tsx .)",
       "Bash(grep -r \"Historical Benchmark\\\\|daily.*scan\\\\|weekly.*scan\" --include=*.ts --include=*.tsx .)",
       "Bash(/tmp/analysis.md:*)",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "Bash(dir e:productbackendsrc /s)"
     ]
   }
 }

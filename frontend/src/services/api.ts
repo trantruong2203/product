@@ -102,6 +102,18 @@ export const enginesAPI = {
 };
 
 export const geoAPI = {
+  // GEO Analysis
+  runScan: (data: {
+    prompt: string;
+    brand: string;
+    competitors: string[];
+    engines?: string[];
+  }) => api.post('/geo/scan', data),
+
+  // Get analysis results (with polling support)
+  getAnalysisResults: (promptId: string) =>
+    api.get(`/geo/results/${promptId}`),
+
   // Dashboard Table (main GEO spec table)
   getDashboardTable: (
     projectId: string,

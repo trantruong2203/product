@@ -5,6 +5,81 @@ export type ScheduleFrequency = 'DAILY' | 'WEEKLY';
 export type Sentiment = 'POSITIVE' | 'NEUTRAL' | 'NEGATIVE';
 export type RecommendationStatus = 'OPEN' | 'ACCEPTED' | 'DONE' | 'DISMISSED';
 export type RecommendationPriority = 'LOW' | 'MEDIUM' | 'HIGH';
+export type MentionType = 'DIRECT' | 'INDIRECT';
+
+/**
+ * Brand mention extracted from AI response
+ */
+export interface BrandMention {
+  brand: string;
+  brandNormalized: string;
+  type: MentionType;
+  position: number;
+  paragraphIndex: number;
+  sentenceIndex: number;
+  context: string;
+  confidence: number;
+  sentiment: Sentiment;
+  isAuthority: boolean;
+  isFeatured: boolean;
+}
+
+/**
+ * GEO Score calculation result
+ */
+export interface GEOScore {
+  totalScore: number;
+  components: {
+    brandPresence: number;
+    authority: number;
+    competitor: number;
+    visibility: number;
+  };
+  details: {
+    totalMentions: number;
+    avgPosition: number;
+    authorityMentions: number;
+    featuredMentions: number;
+    competitorMentions: number;
+    sentimentScore: number;
+  };
+  engineScores: Record<string, number>;
+}
+
+/**
+ * GEO scan request
+ */
+export interface ScanRequest {
+  prompt: string;
+  brand: string;
+  competitors: string[];
+  engines?: string[];
+}
+
+/**
+ * Engine result from a single AI engine
+ */
+export interface EngineResult {
+  engine: string;
+  engineId: string;
+  prompt: string;
+  responseText: string;
+  responseHtml: string;
+  timestamp: Date | null;
+  success: boolean;
+  error: string | null;
+}
+
+/**
+ * GEO scan response
+ */
+export interface ScanResponse {
+  engineResults: EngineResult[];
+  geoScore: number;
+  brandMentions: number;
+  competitorMentions: number;
+  sentiment: Sentiment;
+}
 
 export interface TimeWindowQuery {
   from?: string;
@@ -32,10 +107,6 @@ export interface SoMSeriesRow {
     responses: number;
   };
   brands: SoMBrandRow[];
-  totals: {
-    mentionsAllBrands: number;
-    responses: number;
-  };
 }
 
 export interface GetSoMResponse {

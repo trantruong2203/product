@@ -15,6 +15,7 @@ import scheduleRoutes from './routes/schedule.routes';
 import analysisRoutes from './routes/analysis.routes';
 import recommendationRoutes from './routes/recommendation.routes';
 import dashboardRoutes from './routes/dashboard.routes';
+import geoRoutes from './routes/geo.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 
 const app = express();
@@ -45,6 +46,7 @@ app.use('/api/schedules', scheduleRoutes);
 app.use('/api/analysis', analysisRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/geo', geoRoutes);
 
 app.use(errorHandler);
 

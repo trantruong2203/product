@@ -214,7 +214,7 @@ export default function ProjectDetail() {
     }
   }, [projectId, activeTab, selectedEngine]);
 
-  // Poll for run status if running
+  // Poll for run status if running - also refresh results each poll so user sees incremental progress
   useEffect(() => {
     let interval: ReturnType<typeof setInterval>;
     if (running && projectId) {
@@ -224,7 +224,10 @@ export default function ProjectDetail() {
           if (res.data.success) {
             if (!res.data.data.isRunning) {
               setRunning(false);
-              loadProjectData(); // Refresh data when done
+              loadProjectData(); // Refresh when all jobs done
+            } else {
+              // Still running - refresh results anyway so user sees completed runs (handles stalled jobs)
+              loadProjectData();
             }
           }
         } catch (e) {

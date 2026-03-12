@@ -2,6 +2,9 @@ import { Worker } from "bullmq";
 import { config } from "./config/index.js";
 import { runPromptJob, RunPromptJobData } from "./jobs/runPrompt.js";
 import { browserPool } from "./browsers/browserPool.js";
+import db from "./config/database.js";
+import { runs } from "./db/schema.js";
+import { eq } from "drizzle-orm";
 
 const redisUrl = new URL(config.redis.url);
 const connection = {
@@ -29,8 +32,24 @@ runPromptWorker.on("completed", (job) => {
   console.log(`Job ${job.id} completed`);
 });
 
-runPromptWorker.on("failed", (job, err) => {
+runPromptWorker.on("failed", async (job, err) => {
   console.error(`Job ${job?.id} failed:`, err.message);
+  // When job fails (including stalled), update Run to FAILED so frontend can refresh
+  if (job?.data?.runId) {
+    try {
+      await db
+        .update(runs)
+        .set({
+          status: "FAILED",
+          finishedAt: new Date(),
+          error: err?.message || "Job failed",
+        })
+        .where(eq(runs.id, job.data.runId));
+      console.log(`[Worker] Updated run ${job.data.runId} to FAILED`);
+    } catch (e) {
+      console.error(`[Worker] Failed to update run ${job.data.runId}:`, e);
+    }
+  }
 });
 
 runPromptWorker.on("error", (err) => {

@@ -5,6 +5,7 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import ProjectDetail from './pages/ProjectDetail';
+import { GeoDashboard } from './pages/GeoDashboard';
 import Layout from './components/Layout/Layout';
 import { authAPI } from './services/api';
 
@@ -59,6 +60,7 @@ function App() {
         <Route path="/" element={user ? <Layout user={user} onLogout={handleLogout} /> : <Navigate to="/login" />}>
           <Route index element={<Dashboard />} />
           <Route path="project/:projectId" element={<ProjectDetail />} />
+          <Route path="geo" element={<GeoDashboard />} />
         </Route>
       </Routes>
     </BrowserRouter>

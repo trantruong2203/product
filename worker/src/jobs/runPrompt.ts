@@ -94,20 +94,34 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
           (c: { domain: string }) => c.domain,
         );
 
-        await parseResponse({
-          responseId: response.id,
-          responseText: responseMarkdown, // use Markdown which preserves newlines for position detection
-          brandName: projectRecord.brandName,
-          domain: projectRecord.domain,
-          competitorNames,
-          competitorDomains,
-        });
+        try {
+          console.log(`[PARSER] Starting parseResponse for responseId: ${response.id}`);
+          await parseResponse({
+            responseId: response.id,
+            responseText: responseMarkdown, // use Markdown which preserves newlines for position detection
+            brandName: projectRecord.brandName,
+            domain: projectRecord.domain,
+            competitorNames,
+            competitorDomains,
+          });
+          console.log(`[PARSER] parseResponse completed for responseId: ${response.id}`);
+        } catch (parseError) {
+          console.error(`[PARSER] Error parsing response ${response.id}:`, parseError);
+          // Continue anyway - don't fail the whole job
+        }
 
-        await analyzeAndStoreSentiment({
-          responseId: response.id,
-          text: responseMarkdown,
-          modelVersion: "lexicon-v1",
-        });
+        try {
+          console.log(`[SENTIMENT] Starting sentiment analysis for responseId: ${response.id}`);
+          await analyzeAndStoreSentiment({
+            responseId: response.id,
+            text: responseMarkdown,
+            modelVersion: "lexicon-v1",
+          });
+          console.log(`[SENTIMENT] Sentiment analysis completed for responseId: ${response.id}`);
+        } catch (sentimentError) {
+          console.error(`[SENTIMENT] Error analyzing sentiment for ${response.id}:`, sentimentError);
+          // Continue anyway - don't fail the whole job
+        }
       }
     }
 

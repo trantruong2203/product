@@ -18,6 +18,7 @@ export default function Layout({ user, onLogout }: LayoutProps) {
           </Link>
           <nav className="nav">
             <Link to="/" className="nav-link">{t('layout.dashboard')}</Link>
+            <Link to="/geo" className="nav-link">GEO Analysis</Link>
           </nav>
         </div>
         <div className="header-right">

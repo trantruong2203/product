@@ -257,6 +257,8 @@ export const getProjectRunStatus = async (
     const { projectId } = req.params;
     const userId = req.user!.id;
 
+    console.log(`[RUN] getProjectRunStatus - projectId: ${projectId}, userId: ${userId}`);
+
     // First ensure user owns project
     const projectList = await db
       .select()
@@ -265,22 +267,28 @@ export const getProjectRunStatus = async (
         and(eq(projects.id, projectId as string), eq(projects.userId, userId)),
       );
     if (projectList.length === 0) {
+      console.log(`[RUN] Project not found: ${projectId}`);
       throw new AppError("Project not found", 404);
     }
 
-    // Find any PENDING or PROCESSING runs for this project
+    console.log(`[RUN] Project found, checking for active runs`);
+
+    // Find any PENDING or RUNNING runs for this project
     const activeRuns = await db
       .select({
         id: runs.id,
+        status: runs.status,
       })
       .from(runs)
-      .innerJoin(promptsAlias, eq(runs.promptId, promptsAlias.id))
+      .innerJoin(prompts, eq(runs.promptId, prompts.id))
       .where(
         and(
-          eq(promptsAlias.projectId, projectId as string),
+          eq(prompts.projectId, projectId as string),
           inArray(runs.status, ["PENDING", "RUNNING"]),
         ),
       );
+
+    console.log(`[RUN] Found ${activeRuns.length} active runs`);
 
     res.json({
       success: true,
@@ -290,6 +298,7 @@ export const getProjectRunStatus = async (
       },
     });
   } catch (error) {
+    console.error(`[RUN] Error in getProjectRunStatus:`, error);
     next(error);
   }
 };
