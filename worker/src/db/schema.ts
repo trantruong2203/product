@@ -19,6 +19,7 @@ export const projects = pgTable('Project', {
   domain: text('domain').notNull(),
   brandName: text('brandName').notNull(),
   country: text('country').notNull().default('US'),
+  language: text('language').notNull().default('en'),
   keywords: text('keywords').array().notNull().default([]),
   isActive: boolean('isActive').notNull().default(true),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
@@ -99,11 +100,24 @@ export const responses = pgTable('Response', {
   };
 });
 
+export const sourceTypeEnum = pgEnum('SourceType', ['OWN', 'COMPETITOR', 'THIRD_PARTY']);
+
 export const citations = pgTable('Citation', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   responseId: text('responseId').notNull(),
   brand: text('brand').notNull(),
   domain: text('domain'),
+  url: text('url'),
+  hostname: text('hostname'),
+  path: text('path'),
+  sourceType: sourceTypeEnum('sourceType'),
+  isValid: boolean('isValid'),
+  httpStatus: integer('httpStatus'),
+  mentionedBrand: boolean('mentionedBrand').notNull().default(false),
+  mentionedBrandName: text('mentionedBrandName'),
+  mentionedBrandIsPrimary: boolean('mentionedBrandIsPrimary').notNull().default(false),
+  linkedBrandName: text('linkedBrandName'),
+  linkedBrandType: sourceTypeEnum('linkedBrandType'),
   position: integer('position'),
   confidence: real('confidence').notNull().default(1.0),
   context: text('context'),
@@ -113,6 +127,9 @@ export const citations = pgTable('Citation', {
     responseIdIdx: index('Citation_responseId_idx').on(table.responseId),
     brandIdx: index('Citation_brand_idx').on(table.brand),
     domainIdx: index('Citation_domain_idx').on(table.domain),
+    hostnameIdx: index('Citation_hostname_idx').on(table.hostname),
+    sourceTypeIdx: index('Citation_sourceType_idx').on(table.sourceType),
+    isValidIdx: index('Citation_isValid_idx').on(table.isValid),
   };
 });
 
@@ -132,3 +149,23 @@ export type Response = typeof responses.$inferSelect;
 export type NewResponse = typeof responses.$inferInsert;
 export type Citation = typeof citations.$inferSelect;
 export type NewCitation = typeof citations.$inferInsert;
+
+export const sentimentEnum = pgEnum('Sentiment', ['POSITIVE', 'NEUTRAL', 'NEGATIVE']);
+
+export const responseAnalysis = pgTable('ResponseAnalysis', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  responseId: text('responseId').notNull(),
+  sentiment: sentimentEnum('sentiment').notNull(),
+  sentimentScore: real('sentimentScore').notNull(),
+  narrativeTags: text('narrativeTags').array().notNull().default([]),
+  modelVersion: text('modelVersion'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+}, (table) => {
+  return {
+    responseIdIdx: index('ResponseAnalysis_responseId_idx').on(table.responseId),
+    sentimentIdx: index('ResponseAnalysis_sentiment_idx').on(table.sentiment),
+  };
+});
+
+export type ResponseAnalysis = typeof responseAnalysis.$inferSelect;
+export type NewResponseAnalysis = typeof responseAnalysis.$inferInsert;

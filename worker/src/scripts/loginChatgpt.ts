@@ -1,93 +1,118 @@
 /**
  * Script chạy 1 lần để login thủ công vào ChatGPT.
  * Cookies + session sẽ được lưu vào chrome-profile/chatgpt/
- * và tự động được reuse bởi browserPool.ts mỗi khi worker chạy.
  *
- * Cách dùng: npx tsx src/scripts/loginChatgpt.ts
+ * Run:
+ * npx tsx src/scripts/loginChatgpt.ts
  */
+
 import { chromium } from "playwright-extra";
-import StealthPlugin from "puppeteer-extra-plugin-stealth";
+import stealth from "puppeteer-extra-plugin-stealth";
+import anonymizeUA from "puppeteer-extra-plugin-anonymize-ua";
+import recaptcha from "puppeteer-extra-plugin-recaptcha";
 import * as path from "path";
 import * as fs from "fs";
 
-chromium.use(StealthPlugin());
+// Enable stealth plugins
+chromium.use(stealth());
+chromium.use(anonymizeUA());
 
-// Phải khớp chính xác với profileDir trong browserPool.ts
+if (process.env.RECAPTCHA_API_KEY) {
+  chromium.use(
+    recaptcha({
+      provider: {
+        id: "2captcha",
+        token: process.env.RECAPTCHA_API_KEY,
+      },
+      visualFeedback: true,
+    })
+  );
+}
+
 const profileDir = path.join(process.cwd(), "chrome-profile", "chatgpt");
 
 if (!fs.existsSync(profileDir)) {
   fs.mkdirSync(profileDir, { recursive: true });
-  console.log(`✅ Tạo thư mục profile: ${profileDir}`);
+  console.log(`Tao thu muc profile: ${profileDir}`);
 }
 
 async function login() {
-  console.log("🚀 Mở Chrome với profile:", profileDir);
+
+  console.log("Mo Chrome voi profile:", profileDir);
 
   const context = await chromium.launchPersistentContext(profileDir, {
-    channel: "chromium",
+    channel: "chrome",
     headless: false,
-    viewport: { width: 1280, height: 800 },
+    viewport: { width: 1920, height: 1080 },
     locale: "en-US",
-    userAgent:
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    timezoneId: "America/New_York",
     args: [
-      "--disable-blink-features=AutomationControlled",
       "--no-sandbox",
+      "--disable-setuid-sandbox",
+      "--disable-blink-features=AutomationControlled",
       "--disable-dev-shm-usage",
+      "--disable-gpu",
+      "--no-first-run",
     ],
+    ignoreDefaultArgs: ["--enable-automation"],
   });
 
   const page = await context.newPage();
-  await page.goto("https://chatgpt.com", { waitUntil: "domcontentloaded" });
 
   console.log("");
-  console.log("=".repeat(60));
-  console.log("👤 Hãy đăng nhập thủ công vào ChatGPT trên cửa sổ Chrome");
-  console.log("   - Giải CAPTCHA nếu có");
-  console.log("   - Đợi đến khi vào được trang chat chính");
-  console.log("=".repeat(60));
-  console.log("");
-  console.log("⏳ Sau khi đăng nhập xong, nhấn ENTER ở đây để lưu session...");
+  console.log("============================================================");
+  console.log("Dang mo ChatGPT...");
+  console.log("============================================================");
 
-  await new Promise<void>((resolve) => {
-    process.stdin.resume();
-    process.stdin.once("data", () => resolve());
+  await page.goto("https://chatgpt.com", {
+    waitUntil: "domcontentloaded",
+    timeout: 60000,
   });
 
-  // Kiểm tra đã login thật chưa
-  console.log("🔍 Đang kiểm tra trạng thái đăng nhập...");
+  await page.waitForTimeout(5000);
 
-  const isLoggedIn = await page
-    .waitForSelector(
-      '[data-testid="profile-button"], #prompt-textarea, div[contenteditable="true"]',
-      {
-        timeout: 10000,
-      },
-    )
-    .then(() => true)
-    .catch(() => false);
-
-  if (!isLoggedIn) {
-    console.error("❌ Chưa phát hiện trạng thái login. Hãy thử lại.");
-    await context.close();
-    process.exit(1);
-  }
-
-  console.log("✅ Đã xác nhận đăng nhập thành công!");
-  console.log("💾 Session đã được lưu tự động vào:", profileDir);
   console.log("");
-  console.log("📌 Từ bây giờ, worker sẽ tự dùng session này.");
-  console.log(
-    "   Không cần đăng nhập lại trừ khi session hết hạn (~7-14 ngày).",
-  );
+  console.log("============================================================");
+  console.log("Hay dang nhap thu cong vao ChatGPT tren cua so Chrome");
+  console.log("");
+  console.log("Sau khi dang nhap xong:");
+  console.log("👉 quay lai TERMINAL");
+  console.log("👉 nhan ENTER de luu session");
+  console.log("============================================================");
+  console.log("");
 
-  // Với persistentContext, cookies đã được lưu tự động vào profileDir
-  // Không cần gọi context.storageState() vì browserPool.ts dùng launchPersistentContext
-  await context.close();
-  process.exit(0);
+  // WAIT FOR ENTER
+  process.stdin.resume();
+
+  process.stdin.once("data", async () => {
+
+    console.log("");
+    console.log("Dang luu session...");
+
+    try {
+      await context.storageState({
+        path: path.join(profileDir, "state.json"),
+      });
+    } catch (e) {
+      console.log("Storage state save error (not critical):", e);
+    }
+
+    console.log("Dang dong browser...");
+
+    await context.close();
+
+    console.log("");
+    console.log("============================================================");
+    console.log("Login thanh cong!");
+    console.log("Session da luu vao:", profileDir);
+    console.log("============================================================");
+
+    process.exit(0);
+  });
+
 }
 
 login().catch((err) => {
-  console.error("❌ Lỗi:", err.message);
+  console.error("Loi:", err);
   process.exit(1);
 });

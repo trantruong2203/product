@@ -20,6 +20,7 @@ export const errorHandler = (
   _next: NextFunction
 ) => {
   console.error('Error:', err);
+  console.error('Stack:', err.stack);
 
   if (err instanceof AppError) {
     return res.status(err.statusCode).json({
@@ -30,6 +31,7 @@ export const errorHandler = (
 
   return res.status(500).json({
     success: false,
-    message: 'Internal server error',
+    message: err.message || 'Internal server error',
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
 };

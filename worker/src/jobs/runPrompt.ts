@@ -6,12 +6,12 @@ import {
   projects,
   competitors,
   responses,
-  citations,
 } from "../db/schema.js";
 import { eq } from "drizzle-orm";
-import { getEngine } from "../engines/baseEngine.js";
+import { getEngine } from "../engines/EngineFactory.js";
 import { parseResponse } from "../services/parser.service.js";
 import { htmlToMarkdown } from "../services/markdownConverter.js";
+import { analyzeAndStoreSentiment } from "../services/sentiment.service.js";
 
 export interface RunPromptJobData {
   runId: string;
@@ -101,6 +101,12 @@ export async function runPromptJob(job: Job<RunPromptJobData>): Promise<void> {
           domain: projectRecord.domain,
           competitorNames,
           competitorDomains,
+        });
+
+        await analyzeAndStoreSentiment({
+          responseId: response.id,
+          text: responseMarkdown,
+          modelVersion: "lexicon-v1",
         });
       }
     }

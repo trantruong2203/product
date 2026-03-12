@@ -19,6 +19,7 @@ export const projects = pgTable('Project', {
   domain: text('domain').notNull(),
   brandName: text('brandName').notNull(),
   country: text('country').notNull().default('US'),
+  language: text('language').notNull().default('en'),
   keywords: text('keywords').array().notNull().default([]),
   isActive: boolean('isActive').notNull().default(true),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
@@ -99,11 +100,24 @@ export const responses = pgTable('Response', {
   };
 });
 
+export const sourceTypeEnum = pgEnum('SourceType', ['OWN', 'COMPETITOR', 'THIRD_PARTY']);
+
 export const citations = pgTable('Citation', {
   id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
   responseId: text('responseId').notNull(),
   brand: text('brand').notNull(),
   domain: text('domain'),
+  url: text('url'),
+  hostname: text('hostname'),
+  path: text('path'),
+  sourceType: sourceTypeEnum('sourceType'),
+  isValid: boolean('isValid'),
+  httpStatus: integer('httpStatus'),
+  mentionedBrand: boolean('mentionedBrand').notNull().default(false),
+  mentionedBrandName: text('mentionedBrandName'),
+  mentionedBrandIsPrimary: boolean('mentionedBrandIsPrimary').notNull().default(false),
+  linkedBrandName: text('linkedBrandName'),
+  linkedBrandType: sourceTypeEnum('linkedBrandType'),
   position: integer('position'),
   confidence: real('confidence').notNull().default(1.0),
   context: text('context'),
@@ -113,6 +127,9 @@ export const citations = pgTable('Citation', {
     responseIdIdx: index('Citation_responseId_idx').on(table.responseId),
     brandIdx: index('Citation_brand_idx').on(table.brand),
     domainIdx: index('Citation_domain_idx').on(table.domain),
+    hostnameIdx: index('Citation_hostname_idx').on(table.hostname),
+    sourceTypeIdx: index('Citation_sourceType_idx').on(table.sourceType),
+    isValidIdx: index('Citation_isValid_idx').on(table.isValid),
   };
 });
 
@@ -132,3 +149,96 @@ export type Response = typeof responses.$inferSelect;
 export type NewResponse = typeof responses.$inferInsert;
 export type Citation = typeof citations.$inferSelect;
 export type NewCitation = typeof citations.$inferInsert;
+
+export const alertStatusEnum = pgEnum('AlertStatus', ['OPEN', 'ACKNOWLEDGED', 'RESOLVED']);
+export const alertSeverityEnum = pgEnum('AlertSeverity', ['LOW', 'MEDIUM', 'HIGH']);
+
+export const alerts = pgTable('Alert', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('projectId').notNull(),
+  type: text('type').notNull(),
+  severity: alertSeverityEnum('severity').notNull().default('MEDIUM'),
+  status: alertStatusEnum('status').notNull().default('OPEN'),
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  evidence: text('evidence'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+}, (table) => {
+  return {
+    projectIdIdx: index('Alert_projectId_idx').on(table.projectId),
+    statusIdx: index('Alert_status_idx').on(table.status),
+    severityIdx: index('Alert_severity_idx').on(table.severity),
+  };
+});
+
+export const scheduleFrequencyEnum = pgEnum('ScheduleFrequency', ['DAILY', 'WEEKLY']);
+
+export const scanSchedules = pgTable('ScanSchedule', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('projectId').notNull(),
+  frequency: scheduleFrequencyEnum('frequency').notNull(),
+  dayOfWeek: integer('dayOfWeek'),
+  timeOfDay: text('timeOfDay').notNull(),
+  timezone: text('timezone').notNull(),
+  engines: text('engines').array().notNull().default([]),
+  isActive: boolean('isActive').notNull().default(true),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+}, (table) => {
+  return {
+    projectIdIdx: index('ScanSchedule_projectId_idx').on(table.projectId),
+    activeIdx: index('ScanSchedule_isActive_idx').on(table.isActive),
+  };
+});
+
+export const sentimentEnum = pgEnum('Sentiment', ['POSITIVE', 'NEUTRAL', 'NEGATIVE']);
+
+export const responseAnalysis = pgTable('ResponseAnalysis', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  responseId: text('responseId').notNull(),
+  sentiment: sentimentEnum('sentiment').notNull(),
+  sentimentScore: real('sentimentScore').notNull(),
+  narrativeTags: text('narrativeTags').array().notNull().default([]),
+  modelVersion: text('modelVersion'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+}, (table) => {
+  return {
+    responseIdIdx: index('ResponseAnalysis_responseId_idx').on(table.responseId),
+    sentimentIdx: index('ResponseAnalysis_sentiment_idx').on(table.sentiment),
+  };
+});
+
+export const recommendationStatusEnum = pgEnum('RecommendationStatus', ['OPEN', 'ACCEPTED', 'DONE', 'DISMISSED']);
+export const recommendationPriorityEnum = pgEnum('RecommendationPriority', ['LOW', 'MEDIUM', 'HIGH']);
+
+export const recommendations = pgTable('Recommendation', {
+  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  projectId: text('projectId').notNull(),
+  keyword: text('keyword'),
+  type: text('type').notNull(),
+  priority: recommendationPriorityEnum('priority').notNull().default('MEDIUM'),
+  status: recommendationStatusEnum('status').notNull().default('OPEN'),
+  title: text('title').notNull(),
+  reason: text('reason').notNull(),
+  suggestedAction: text('suggestedAction').notNull(),
+  evidence: text('evidence'),
+  createdAt: timestamp('createdAt').defaultNow().notNull(),
+  updatedAt: timestamp('updatedAt').defaultNow().notNull(),
+}, (table) => {
+  return {
+    projectIdIdx: index('Recommendation_projectId_idx').on(table.projectId),
+    statusIdx: index('Recommendation_status_idx').on(table.status),
+    priorityIdx: index('Recommendation_priority_idx').on(table.priority),
+    keywordIdx: index('Recommendation_keyword_idx').on(table.keyword),
+  };
+});
+
+export type Alert = typeof alerts.$inferSelect;
+export type NewAlert = typeof alerts.$inferInsert;
+export type ScanSchedule = typeof scanSchedules.$inferSelect;
+export type NewScanSchedule = typeof scanSchedules.$inferInsert;
+export type ResponseAnalysis = typeof responseAnalysis.$inferSelect;
+export type NewResponseAnalysis = typeof responseAnalysis.$inferInsert;
+export type Recommendation = typeof recommendations.$inferSelect;
+export type NewRecommendation = typeof recommendations.$inferInsert;

@@ -16,6 +16,8 @@ import type { AuthRequest } from "../middleware/authenticate.js";
 // Shared helpers
 // ─────────────────────────────────────────────────────────────────────────────
 
+type SourceType = "OWN" | "COMPETITOR" | "THIRD_PARTY";
+
 interface CitationRow {
   id: string;
   responseId: string;
@@ -24,6 +26,12 @@ interface CitationRow {
   position: number | null;
   confidence: number | null;
   context: string | null;
+  mentionedBrand: boolean;
+  mentionedBrandName: string | null;
+  mentionedBrandIsPrimary: boolean;
+  linkedBrandName: string | null;
+  linkedBrandType: SourceType | null;
+  sourceType: SourceType | null;
 }
 
 interface ResponseRow {
@@ -86,6 +94,10 @@ export const getProjectResults = async (
     const { projectId } = req.params;
     const userId = req.user!.id;
 
+    if (!projectId) {
+      throw new AppError("Project ID is required", 400);
+    }
+
     const projectList = await db
       .select()
       .from(projects)
@@ -94,7 +106,9 @@ export const getProjectResults = async (
       );
 
     const project = projectList[0];
+
     if (!project) throw new AppError("Project not found", 404);
+    const mainBrandName = project.brandName.toLowerCase();
 
     // Fetch completed runs for this project
     const runsData = await db
@@ -143,29 +157,29 @@ export const getProjectResults = async (
       }),
     );
 
-    // All citations for main brand
+    // All citations for main brand (textual mentions only)
     const brandCitations: CitationRow[] = runsWithDetails.flatMap((run) =>
       run.responses.flatMap((resp) =>
         resp.citations.filter(
-          (c) => c.brand.toLowerCase() === project.brandName.toLowerCase(),
+          (c) =>
+            c.mentionedBrand &&
+            c.mentionedBrandName &&
+            project.brandName &&
+            c.mentionedBrandName.toLowerCase() === project.brandName.toLowerCase(),
         ),
       ),
     );
+
+    const totalMainBrandMentions = brandCitations.length;
 
     // Competitors
     const competitorsList = await db
       .select()
       .from(competitors)
       .where(eq(competitors.projectId, projectId as string));
-    const competitorNames = competitorsList.map((c) => c.name.toLowerCase());
+    const competitorNames = competitorsList.map((c) => c.name?.toLowerCase() || "");
 
-    const competitorMentions: CitationRow[] = runsWithDetails.flatMap((run) =>
-      run.responses.flatMap((resp) =>
-        resp.citations.filter((c) =>
-          competitorNames.includes(c.brand.toLowerCase()),
-        ),
-      ),
-    );
+
 
     // Active prompts
     const promptsData = await db
@@ -231,7 +245,6 @@ export const getProjectResults = async (
         confidenceScore: Math.round(confidenceScore * 100) / 100,
         totalRuns: runsWithDetails.length,
         totalCitations: brandCitations.length,
-        competitorMentions: competitorMentions.length,
         recentRuns: runsWithDetails.slice(0, 10),
       },
     });
@@ -330,7 +343,7 @@ export const getProjectHistory = async (
 
       const brandCitationsForRun: CitationRow[] = run.responses.flatMap((r) =>
         r.citations.filter(
-          (c) => c.brand.toLowerCase() === project.brandName.toLowerCase(),
+          (c) => c.brand.toLowerCase() === (project.brandName || "").toLowerCase(),
         ),
       );
 
@@ -446,22 +459,27 @@ export const getCompetitorComparison = async (
     ): number =>
       runsWithResponses.flatMap((run) =>
         run.responses.flatMap((resp) =>
-          resp.citations.filter((c) =>
-            isDomain
-              ? c.domain?.includes(brandNameOrDomain)
-              : c.brand.toLowerCase() === brandNameOrDomain.toLowerCase(),
-          ),
+          resp.citations.filter((c) => {
+            const brand = c.brand?.toLowerCase() || "";
+            const domain = c.domain?.toLowerCase() || "";
+            const target = brandNameOrDomain?.toLowerCase() || "";
+
+            if (isDomain) {
+              return domain.includes(target);
+            }
+            return brand === target;
+          }),
         ),
       ).length;
 
-    const brandCitationCount = countCitations(project.brandName);
+    const brandCitationCount = countCitations(project.brandName || "");
 
     const competitorData = competitorsData.map((competitor) => ({
       name: competitor.name,
       domain: competitor.domain,
       citations:
-        countCitations(competitor.name) +
-        countCitations(competitor.domain, true),
+        countCitations(competitor.name || "") +
+        countCitations(competitor.domain || "", true),
     }));
 
     res.json({
@@ -509,7 +527,7 @@ export const getPromptRankings = async (
       .from(prompts)
       .where(eq(prompts.projectId, projectId as string));
 
-    const whereConditions: any[] = [
+    const whereConditions = [
       eq(prompts.projectId, projectId as string),
       eq(runs.status, "COMPLETED"),
     ];
@@ -520,21 +538,21 @@ export const getPromptRankings = async (
       .from(runs)
       .innerJoin(prompts, eq(runs.promptId, prompts.id))
       .innerJoin(aiEngines, eq(runs.engineId, aiEngines.id))
-      .where(and(...whereConditions));
+      .where(whereConditions.length > 0 ? and(...whereConditions) : undefined);
 
     // Fetch all responses + citations in bulk
+    const responseWhereConditions = [
+      eq(prompts.projectId, projectId as string),
+      eq(runs.status, "COMPLETED"),
+    ];
+    if (engineId) responseWhereConditions.push(eq(runs.engineId, engineId as string));
+
     const allResponses = await db
       .select()
       .from(responses)
       .innerJoin(runs, eq(responses.runId, runs.id))
       .innerJoin(prompts, eq(runs.promptId, prompts.id))
-      .where(
-        and(
-          eq(prompts.projectId, projectId as string),
-          eq(runs.status, "COMPLETED"),
-          engineId ? eq(runs.engineId, engineId as string) : undefined,
-        ),
-      );
+      .where(responseWhereConditions.length > 0 ? and(...responseWhereConditions) : undefined);
 
     const responseIds = allResponses.map((r) => r.Response.id);
     const allCitations =
@@ -550,8 +568,8 @@ export const getPromptRankings = async (
       .from(competitors)
       .where(eq(competitors.projectId, projectId as string));
     const allBrands = [
-      { name: project.brandName, isMain: true },
-      ...competitorsData.map((c) => ({ name: c.name, isMain: false })),
+      { name: project.brandName || "", isMain: true },
+      ...competitorsData.map((c) => ({ name: c.name || "", isMain: false })),
     ];
 
     // Group citations by (promptId, engineId, brand) → collect positions + count
@@ -567,7 +585,9 @@ export const getPromptRankings = async (
       const run = runsData.find((r) => r.Run.id === response.Response.runId);
       if (!run) continue;
 
-      const key = `${run.Prompt.id}|${run.AIEngine.id}|${citation.brand.toLowerCase()}`;
+      // Safety check for brand
+      const brand = citation.brand?.toLowerCase() || "unknown";
+      const key = `${run.Prompt.id}|${run.AIEngine.id}|${brand}`;
       if (!citationGroups.has(key)) {
         citationGroups.set(key, { positions: [], weightedCount: 0 });
       }
@@ -610,9 +630,9 @@ export const getPromptRankings = async (
 
       rankingMap.set(key, {
         promptId,
-        promptQuery: prompt.query,
-        engineId: engine.id,
-        engineName: engine.name,
+        promptQuery: prompt.query || "",
+        engineId: engine.id || "",
+        engineName: engine.name || "",
         brand,
         rank: 0, // assigned below
         mentions: Math.round(data.weightedCount * 100) / 100, // weighted count
@@ -655,7 +675,7 @@ export const getPromptRankings = async (
 
     finalRankings.sort((a, b) => {
       if (a.promptQuery !== b.promptQuery)
-        return a.promptQuery.localeCompare(b.promptQuery);
+        return (a.promptQuery || "").localeCompare(b.promptQuery || "");
       return a.rank - b.rank;
     });
 

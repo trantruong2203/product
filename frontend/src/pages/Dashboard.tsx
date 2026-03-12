@@ -77,6 +77,27 @@ export default function Dashboard() {
     }
   };
 
+  const handleDeleteProject = async (
+    e: React.MouseEvent,
+    projectId: string,
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (
+      window.confirm(
+        "Are you sure you want to delete this project? This action cannot be undone.",
+      )
+    ) {
+      try {
+        await projectsAPI.delete(projectId);
+        setProjects(projects.filter((p) => p.id !== projectId));
+      } catch (error) {
+        console.error("Failed to delete project", error);
+        alert("Failed to delete project");
+      }
+    }
+  };
+
   if (loading) {
     return <div>{t("app.loading")}</div>;
   }
@@ -123,6 +144,29 @@ export default function Dashboard() {
                     <span className="stat-value">{project._count.runs}</span>
                     <span className="stat-label">{t("dashboard.runs")}</span>
                   </div>
+                </div>
+                <div
+                  style={{
+                    marginTop: "1rem",
+                    borderTop: "1px solid #444",
+                    paddingTop: "1rem",
+                  }}
+                >
+                  <button
+                    onClick={(e) => handleDeleteProject(e, project.id)}
+                    style={{
+                      width: "100%",
+                      padding: "0.5rem",
+                      background: "#ef4444",
+                      color: "white",
+                      border: "none",
+                      borderRadius: "4px",
+                      cursor: "pointer",
+                      fontWeight: 600,
+                    }}
+                  >
+                    Delete Project
+                  </button>
                 </div>
               </Link>
             );
