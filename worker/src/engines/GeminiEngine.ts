@@ -16,7 +16,7 @@ const GEMINI_SELECTORS: EngineSelectors = {
   // Input selectors - prioritized by reliability
   input: [
     // Primary: textarea with known IDs
-    'textarea#prompt-textarea',
+    "textarea#prompt-textarea",
     'textarea[aria-label*="Enter a prompt"]',
     'textarea[placeholder*="Enter a prompt"]',
     // Fallback: contenteditable divs
@@ -24,8 +24,8 @@ const GEMINI_SELECTORS: EngineSelectors = {
     'div[contenteditable="true"][aria-label*="message"]',
     'div[contenteditable="true"][data-id*="prompt"]',
     // General textarea fallbacks
-    'textarea:visible',
-    'form textarea',
+    "textarea:visible",
+    "form textarea",
   ],
   // Submit selectors - Gemini uses a submit button
   submit: [
@@ -36,21 +36,21 @@ const GEMINI_SELECTORS: EngineSelectors = {
     'button:has(svg[data-test-id*="send"])',
     'button:has-text("Send")',
     // Fallback: Last button in the input form
-    'form button:last-child',
+    "form button:last-child",
   ],
   // Response selectors - prioritized by reliability
   response: [
     // Primary: Response container with data attributes
     '[data-test-id*="conversation-turn-3"]',
     '[data-test-id*="response"]',
-    '.model-response',
+    ".model-response",
     // Fallback: Content containers
-    '.markdown',
-    '.response-content',
+    ".markdown",
+    ".response-content",
     '[role="presentation"]',
     // Legacy
-    '.text-base',
-    '.message-content',
+    ".text-base",
+    ".message-content",
   ],
   // Login button selectors
   loginButton: [
@@ -88,7 +88,9 @@ export class GeminiEngine extends EngineBase {
     if (!this.page) return;
 
     // Wait for the page to fully load
-    await this.page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+    await this.page
+      .waitForLoadState("networkidle", { timeout: 30000 })
+      .catch(() => {});
 
     // Dismiss any welcome modals
     await this.dismissModals();
@@ -122,7 +124,9 @@ export class GeminiEngine extends EngineBase {
 
     // Try to dismiss welcome modal
     try {
-      const closeButton = await this.page.$('button[aria-label*="Close"], button:has-text("Got it")');
+      const closeButton = await this.page.$(
+        'button[aria-label*="Close"], button:has-text("Got it")',
+      );
       if (closeButton) {
         await closeButton.click();
         await this.randomDelay(500, 1000);
@@ -148,7 +152,9 @@ export class GeminiEngine extends EngineBase {
   /**
    * Enhanced input finding for Gemini's dynamic UI
    */
-  protected async findInputField(): Promise<import("playwright").ElementHandle | null> {
+  protected async findInputField(): Promise<
+    import("playwright").ElementHandle | null
+  > {
     if (!this.page) return null;
 
     // First try standard selectors
@@ -159,9 +165,9 @@ export class GeminiEngine extends EngineBase {
     try {
       const input = await this.page.evaluateHandle(() => {
         // Gemini uses a textarea inside a form
-        const forms = document.querySelectorAll('form');
+        const forms = Array.from(document.querySelectorAll("form"));
         for (const form of forms) {
-          const textarea = form.querySelector('textarea');
+          const textarea = form.querySelector("textarea");
           if (textarea) {
             return textarea;
           }
@@ -174,9 +180,10 @@ export class GeminiEngine extends EngineBase {
         return null;
       });
 
-      if (input && await input.isVisible()) {
+      const el = input.asElement();
+      if (el && (await el.isVisible())) {
         console.log("✅ Found input via DOM search");
-        return input.asElement();
+        return el;
       }
     } catch {
       // Ignore
@@ -190,7 +197,7 @@ export class GeminiEngine extends EngineBase {
    */
   protected async typePrompt(
     input: import("playwright").ElementHandle,
-    prompt: string
+    prompt: string,
   ): Promise<void> {
     if (!this.page) return;
 
@@ -246,17 +253,21 @@ export class GeminiEngine extends EngineBase {
         : [this.selectors.submit];
 
       for (const selector of submitSelectors) {
+        if (!selector) continue;
         try {
           const button = await this.page.$(selector);
           if (button) {
             const isEnabled = await button.isEnabled();
             if (!isEnabled) {
               console.log("⏳ Waiting for submit button to be enabled...");
-              await this.page.waitForFunction(
-                (btn) => btn instanceof HTMLButtonElement && btn.disabled === false,
-                await button,
-                { timeout: 5000 }
-              ).catch(() => {});
+              await this.page
+                .waitForFunction(
+                  (btn) =>
+                    btn instanceof HTMLButtonElement && btn.disabled === false,
+                  await button,
+                  { timeout: 5000 },
+                )
+                .catch(() => {});
             }
             break;
           }
@@ -301,8 +312,8 @@ export class GeminiEngine extends EngineBase {
         // Try various message container patterns
         const messageContainers = [
           '[data-test-id*="conversation-turn-3"]',
-          '.model-response',
-          '.markdown',
+          ".model-response",
+          ".markdown",
         ];
 
         for (const selector of messageContainers) {
@@ -334,6 +345,7 @@ export class GeminiEngine extends EngineBase {
     let submitted = false;
 
     for (const selector of submitSelectors) {
+      if (!selector) continue;
       try {
         const button = await this.page.waitForSelector(selector, {
           state: "visible",
@@ -360,6 +372,9 @@ export class GeminiEngine extends EngineBase {
       await this.page.keyboard.press("Enter");
     }
 
-    await this.randomDelay(this.options.submitWait!, this.options.submitWait! + 500);
+    await this.randomDelay(
+      this.options.submitWait!,
+      this.options.submitWait! + 500,
+    );
   }
 }

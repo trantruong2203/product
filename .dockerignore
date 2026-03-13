@@ -1,10 +1,13 @@
 # Dependencies
 node_modules
 bower_components
+**/node_modules
 
 # Build outputs
 dist
 build
+**/dist
+**/build
 
 # Logs
 logs
@@ -34,15 +37,20 @@ Thumbs.db
 worker/src/chrome-profile
 worker/chrome-profile
 worker/src/sessions
+**/chrome-profile
+**/sessions
 
 # Docker
 Dockerfile
 docker-compose*.yml
+.dockerignore
 
 # Test
 coverage
 .nyc_output
+tests-results
 
 # Docs
 *.md
 !README.md
+docs/

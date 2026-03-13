@@ -19,7 +19,7 @@ chromium.use(
       token: process.env.RECAPTCHA_API_KEY || "", // Set your 2Captcha API key in .env
     },
     visualFeedback: true,
-  })
+  }),
 );
 
 const profileDir = path.join(process.cwd(), "chrome-profile");
@@ -114,7 +114,9 @@ export class BrowserPool {
       this.contexts.delete(engine);
     }
 
-    console.log(`🚀 Launching browser for ${engine} with stealth + recaptcha mode...`);
+    console.log(
+      `🚀 Launching browser for ${engine} with stealth + recaptcha mode...`,
+    );
 
     const userDataDir = path.join(profileDir, engine);
     if (!fs.existsSync(userDataDir)) {
@@ -133,8 +135,7 @@ export class BrowserPool {
 
     // Enhanced stealth launch options
     const context = await chromium.launchPersistentContext(userDataDir, {
-      channel: "chrome",
-      headless: false, // Set true on server with xvfb
+      headless: true,
       args: [
         "--no-sandbox",
         "--disable-setuid-sandbox",
@@ -168,10 +169,7 @@ export class BrowserPool {
         "--disable-webgl2",
         `--window-position=${Math.floor(Math.random() * 1000)},${Math.floor(Math.random() * 500)}`,
       ],
-      ignoreDefaultArgs: [
-        "--enable-automation",
-        "--enable-logging",
-      ],
+      ignoreDefaultArgs: ["--enable-automation", "--enable-logging"],
       viewport,
       userAgent,
       locale,
@@ -180,7 +178,7 @@ export class BrowserPool {
       extraHTTPHeaders: {
         "Accept-Language": locale,
         "Accept-Encoding": "gzip, deflate, br",
-        "Connection": "keep-alive",
+        Connection: "keep-alive",
         "Upgrade-Insecure-Requests": "1",
       },
     });
@@ -213,9 +211,21 @@ export class BrowserPool {
       // Override plugins
       Object.defineProperty(navigator, "plugins", {
         get: () => [
-          { name: "Chrome PDF Plugin", description: "Portable Document Format", filename: "internal-pdf-viewer" },
-          { name: "Chrome PDF Viewer", description: "", filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai" },
-          { name: "Native Client", description: "", filename: "internal-nacl-plugin" },
+          {
+            name: "Chrome PDF Plugin",
+            description: "Portable Document Format",
+            filename: "internal-pdf-viewer",
+          },
+          {
+            name: "Chrome PDF Viewer",
+            description: "",
+            filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai",
+          },
+          {
+            name: "Native Client",
+            description: "",
+            filename: "internal-nacl-plugin",
+          },
         ],
         configurable: true,
       });
@@ -239,7 +249,9 @@ export class BrowserPool {
       const originalQuery = window.navigator.permissions.query;
       window.navigator.permissions.query = (parameters: any) =>
         parameters.name === "notifications"
-          ? Promise.resolve({ state: Notification.permission } as PermissionStatus)
+          ? Promise.resolve({
+              state: Notification.permission,
+            } as PermissionStatus)
           : originalQuery(parameters);
 
       // Override Notification

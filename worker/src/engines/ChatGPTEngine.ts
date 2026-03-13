@@ -29,12 +29,12 @@ const CHATGPT_SELECTORS: EngineSelectors = {
     // Primary: data-testid for assistant messages
     '[data-message-author-role="assistant"]',
     // Fallback: assistant message class
-    '.markdown.prose',
+    ".markdown.prose",
     '[data-testid="conversation-turn-3"]',
     '[data-testid="conversation-turn-5"]',
     // Legacy
-    '.text-base',
-    '.group\\/conversation-turn',
+    ".text-base",
+    ".group\\/conversation-turn",
   ],
   // Login button selectors
   loginButton: [
@@ -71,7 +71,9 @@ export class ChatGPTEngine extends EngineBase {
     if (!this.page) return;
 
     // Wait for the page to fully load
-    await this.page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+    await this.page
+      .waitForLoadState("networkidle", { timeout: 30000 })
+      .catch(() => {});
 
     // Dismiss any welcome modals or cookie banners
     await this.dismissModals();
@@ -114,7 +116,7 @@ export class ChatGPTEngine extends EngineBase {
 
     // Check if we're on a chat page with existing conversation
     const currentUrl = this.page.url();
-    if (currentUrl.includes('/c/')) {
+    if (currentUrl.includes("/c/")) {
       // We're in an existing chat - optionally start new chat
       // For now, we'll just continue with the current chat
       console.log("📝 Continuing with existing chat");
@@ -130,7 +132,9 @@ export class ChatGPTEngine extends EngineBase {
   /**
    * Enhanced input finding for ChatGPT's dynamic UI
    */
-  protected async findInputField(): Promise<import("playwright").ElementHandle | null> {
+  protected async findInputField(): Promise<
+    import("playwright").ElementHandle | null
+  > {
     if (!this.page) return null;
 
     // First try standard selectors
@@ -141,9 +145,11 @@ export class ChatGPTEngine extends EngineBase {
     try {
       const input = await this.page.evaluateHandle(() => {
         // Find the main input container
-        const forms = document.querySelectorAll('form');
+        const forms = Array.from(document.querySelectorAll("form"));
         for (const form of forms) {
-          const textarea = form.querySelector('textarea, div[contenteditable="true"]');
+          const textarea = form.querySelector(
+            'textarea, div[contenteditable="true"]',
+          );
           if (textarea) {
             return textarea;
           }
@@ -151,9 +157,10 @@ export class ChatGPTEngine extends EngineBase {
         return null;
       });
 
-      if (input && await input.isVisible()) {
+      const el = input.asElement();
+      if (el && (await el.isVisible())) {
         console.log("✅ Found input via DOM search");
-        return input.asElement();
+        return el;
       }
     } catch {
       // Ignore
@@ -167,7 +174,7 @@ export class ChatGPTEngine extends EngineBase {
    */
   protected async typePrompt(
     input: import("playwright").ElementHandle,
-    prompt: string
+    prompt: string,
   ): Promise<void> {
     if (!this.page) return;
 
@@ -201,21 +208,27 @@ export class ChatGPTEngine extends EngineBase {
     if (!this.page) return;
 
     try {
-      const sendButton = await this.page.waitForSelector('button[data-testid="send-button"], button[aria-label*="Send"]', {
-        state: "visible",
-        timeout: 5000,
-      });
+      const sendButton = await this.page.waitForSelector(
+        'button[data-testid="send-button"], button[aria-label*="Send"]',
+        {
+          state: "visible",
+          timeout: 5000,
+        },
+      );
 
       if (sendButton) {
         // Check if it's enabled
         const isEnabled = await sendButton.isEnabled();
         if (!isEnabled) {
           console.log("⏳ Waiting for send button to be enabled...");
-          await this.page.waitForFunction(
-            (btn) => btn instanceof HTMLButtonElement && btn.disabled === false,
-            await sendButton,
-            { timeout: 5000 }
-          ).catch(() => {});
+          await this.page
+            .waitForFunction(
+              (btn) =>
+                btn instanceof HTMLButtonElement && btn.disabled === false,
+              await sendButton,
+              { timeout: 5000 },
+            )
+            .catch(() => {});
         }
       }
     } catch {
@@ -252,7 +265,9 @@ export class ChatGPTEngine extends EngineBase {
     // Fallback: Try to get text from the most recent message
     try {
       const text = await this.page.evaluate(() => {
-        const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
+        const messages = document.querySelectorAll(
+          '[data-message-author-role="assistant"]',
+        );
         if (messages.length > 0) {
           return messages[messages.length - 1].textContent || "";
         }

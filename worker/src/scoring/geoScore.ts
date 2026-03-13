@@ -11,29 +11,37 @@ export class GEOCalculator {
   calculateScore(
     brandMentions: BrandMention[],
     competitorMentions: BrandMention[],
-    responseLength: number
+    responseLength: number,
   ): GEOScore {
     const brandPresence = this.calculateBrandPresence(brandMentions);
     const authority = this.calculateAuthority(brandMentions);
-    const competitor = this.calculateCompetitorComparison(brandMentions, competitorMentions);
+    const competitor = this.calculateCompetitorComparison(
+      brandMentions,
+      competitorMentions,
+    );
     const visibility = this.calculateVisibility(brandMentions, responseLength);
 
     // Weighted final score
     const totalScore = Math.round(
       brandPresence * 0.35 +
-      authority * 0.25 +
-      competitor * 0.20 +
-      visibility * 0.20
+        authority * 0.25 +
+        competitor * 0.2 +
+        visibility * 0.2,
     );
 
     return {
       totalScore: Math.min(100, totalScore),
-      components: { brandPresence, authority, competitor, visibility },
+      components: {
+        brandPresence,
+        authority,
+        competitorComparison: competitor,
+        visibility,
+      },
       details: {
         totalMentions: brandMentions.length,
         avgPosition: this.getAveragePosition(brandMentions),
-        authorityMentions: brandMentions.filter(m => m.isAuthority).length,
-        featuredMentions: brandMentions.filter(m => m.isFeatured).length,
+        authorityMentions: brandMentions.filter((m) => m.isAuthority).length,
+        featuredMentions: brandMentions.filter((m) => m.isFeatured).length,
         competitorMentions: competitorMentions.length,
         sentimentScore: this.getSentimentScore(brandMentions),
       },
@@ -56,7 +64,7 @@ export class GEOCalculator {
     const positionScore = this.calculatePositionScore(avgPosition);
 
     // Type bonus
-    const directMentions = mentions.filter(m => m.type === 'DIRECT').length;
+    const directMentions = mentions.filter((m) => m.type === "DIRECT").length;
     const typeScore = (directMentions / mentions.length) * 30;
 
     return Math.min(100, frequencyScore + positionScore + typeScore);
@@ -69,7 +77,7 @@ export class GEOCalculator {
   private calculateAuthority(mentions: BrandMention[]): number {
     if (mentions.length === 0) return 0;
 
-    const authorityMentions = mentions.filter(m => m.isAuthority);
+    const authorityMentions = mentions.filter((m) => m.isAuthority);
     const authorityScore = (authorityMentions.length / mentions.length) * 50;
 
     const sentimentScore = this.getSentimentScore(mentions) * 50;
@@ -83,7 +91,7 @@ export class GEOCalculator {
    */
   private calculateCompetitorComparison(
     brandMentions: BrandMention[],
-    competitorMentions: BrandMention[]
+    competitorMentions: BrandMention[],
   ): number {
     const brandCount = brandMentions.length;
     const competitorCount = competitorMentions.length;
@@ -101,16 +109,17 @@ export class GEOCalculator {
    */
   private calculateVisibility(
     mentions: BrandMention[],
-    responseLength: number
+    responseLength: number,
   ): number {
     if (mentions.length === 0) return 0;
 
     // Featured mentions (first paragraph)
-    const featuredMentions = mentions.filter(m => m.isFeatured);
+    const featuredMentions = mentions.filter((m) => m.isFeatured);
     const featuredScore = Math.min(50, featuredMentions.length * 25);
 
     // Paragraph coverage
-    const uniqueParagraphs = new Set(mentions.map(m => m.paragraphIndex)).size;
+    const uniqueParagraphs = new Set(mentions.map((m) => m.paragraphIndex))
+      .size;
     const coverageScore = Math.min(50, uniqueParagraphs * 10);
 
     return featuredScore + coverageScore;
@@ -122,7 +131,7 @@ export class GEOCalculator {
   }
 
   private getAveragePosition(mentions: BrandMention[]): number {
-    const positions = mentions.map(m => m.position).filter(p => p > 0);
+    const positions = mentions.map((m) => m.position).filter((p) => p > 0);
     if (positions.length === 0) return 0;
     return positions.reduce((a, b) => a + b, 0) / positions.length;
   }
@@ -130,15 +139,20 @@ export class GEOCalculator {
   private getSentimentScore(mentions: BrandMention[]): number {
     if (mentions.length === 0) return 50; // Neutral
 
-    const sentimentValues = mentions.map(m => {
+    const sentimentValues = mentions.map((m) => {
       switch (m.sentiment) {
-        case 'POSITIVE': return 1;
-        case 'NEGATIVE': return -1;
-        default: return 0;
+        case "POSITIVE":
+          return 1;
+        case "NEGATIVE":
+          return -1;
+        default:
+          return 0;
       }
     });
 
-    const avgSentiment = sentimentValues.reduce((a, b) => a + b, 0) / sentimentValues.length;
+    const avgSentiment =
+      sentimentValues.reduce((a: number, b: number) => a + b, 0) /
+      sentimentValues.length;
     return Math.round((avgSentiment + 1) * 50); // -1 to 1 -> 0 to 100
   }
 }

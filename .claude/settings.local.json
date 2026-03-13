@@ -57,7 +57,9 @@
       "Bash(grep -r \"Historical Benchmark\\\\|daily.*scan\\\\|weekly.*scan\" --include=*.ts --include=*.tsx .)",
       "Bash(/tmp/analysis.md:*)",
       "Read(//tmp/**)",
-      "Bash(dir e:productbackendsrc /s)"
+      "Bash(dir e:productbackendsrc /s)",
+      "Bash(npm run:*)",
+      "Bash(docker exec:*)"
     ]
   }
 }

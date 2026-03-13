@@ -34,13 +34,13 @@ const CLAUDE_SELECTORS: EngineSelectors = {
     '[data-testid="message"][data-message-role="assistant"]',
     '[data-message-author-role="assistant"]',
     // Fallback: assistant message class
-    '.font-claude-message',
-    '.prose',
+    ".font-claude-message",
+    ".prose",
     '[data-testid*="conversation-turn"]',
     // Legacy
-    '.message-content',
-    '.markdown',
-    '.text-base',
+    ".message-content",
+    ".markdown",
+    ".text-base",
   ],
   // Login button selectors
   loginButton: [
@@ -78,7 +78,9 @@ export class ClaudeEngine extends EngineBase {
     if (!this.page) return;
 
     // Wait for the page to fully load
-    await this.page.waitForLoadState("networkidle", { timeout: 30000 }).catch(() => {});
+    await this.page
+      .waitForLoadState("networkidle", { timeout: 30000 })
+      .catch(() => {});
 
     // Dismiss any welcome modals or cookie banners
     await this.dismissModals();
@@ -113,7 +115,9 @@ export class ClaudeEngine extends EngineBase {
 
     // Try to dismiss welcome modal
     try {
-      const closeButton = await this.page.$('button[aria-label*="Close"], button:has-text("Got it")');
+      const closeButton = await this.page.$(
+        'button[aria-label*="Close"], button:has-text("Got it")',
+      );
       if (closeButton) {
         await closeButton.click();
         await this.randomDelay(500, 1000);
@@ -131,7 +135,7 @@ export class ClaudeEngine extends EngineBase {
 
     // Check if we need to start a new chat
     const currentUrl = this.page.url();
-    if (currentUrl.includes('/c/')) {
+    if (currentUrl.includes("/c/")) {
       console.log("📝 Continuing with existing chat");
     }
 
@@ -145,7 +149,9 @@ export class ClaudeEngine extends EngineBase {
   /**
    * Enhanced input finding for Claude's dynamic UI
    */
-  protected async findInputField(): Promise<import("playwright").ElementHandle | null> {
+  protected async findInputField(): Promise<
+    import("playwright").ElementHandle | null
+  > {
     if (!this.page) return null;
 
     // First try standard selectors
@@ -156,16 +162,18 @@ export class ClaudeEngine extends EngineBase {
     try {
       const input = await this.page.evaluateHandle(() => {
         // Find the main input container
-        const forms = document.querySelectorAll('form');
+        const forms = Array.from(document.querySelectorAll("form"));
         for (const form of forms) {
-          const textarea = form.querySelector('textarea, div[contenteditable="true"]');
+          const textarea = form.querySelector(
+            'textarea, div[contenteditable="true"]',
+          );
           if (textarea) {
             return textarea;
           }
         }
 
         // Also check main content area
-        const main = document.querySelector('main');
+        const main = document.querySelector("main");
         if (main) {
           const editable = main.querySelector('div[contenteditable="true"]');
           if (editable) {
@@ -176,9 +184,10 @@ export class ClaudeEngine extends EngineBase {
         return null;
       });
 
-      if (input && await input.isVisible()) {
+      const el = input.asElement();
+      if (el && (await el.isVisible())) {
         console.log("✅ Found input via DOM search");
-        return input.asElement();
+        return el;
       }
     } catch {
       // Ignore
@@ -192,7 +201,7 @@ export class ClaudeEngine extends EngineBase {
    */
   protected async typePrompt(
     input: import("playwright").ElementHandle,
-    prompt: string
+    prompt: string,
   ): Promise<void> {
     if (!this.page) return;
 
@@ -226,17 +235,22 @@ export class ClaudeEngine extends EngineBase {
     if (!this.page) return;
 
     try {
-      const sendButton = await this.page.$('button[aria-label*="Send"], button[type="submit"]');
+      const sendButton = await this.page.$(
+        'button[aria-label*="Send"], button[type="submit"]',
+      );
       if (sendButton) {
         // Check if it's enabled
         const isEnabled = await sendButton.isEnabled();
         if (!isEnabled) {
           console.log("⏳ Waiting for send button to be enabled...");
-          await this.page.waitForFunction(
-            (btn) => btn instanceof HTMLButtonElement && btn.disabled === false,
-            await sendButton,
-            { timeout: 5000 }
-          ).catch(() => {});
+          await this.page
+            .waitForFunction(
+              (btn) =>
+                btn instanceof HTMLButtonElement && btn.disabled === false,
+              await sendButton,
+              { timeout: 5000 },
+            )
+            .catch(() => {});
         }
       }
     } catch {
@@ -277,8 +291,8 @@ export class ClaudeEngine extends EngineBase {
         const messageContainers = [
           '[data-testid="message-content"]',
           '[data-message-author-role="assistant"]',
-          '.font-claude-message',
-          '.prose',
+          ".font-claude-message",
+          ".prose",
         ];
 
         for (const selector of messageContainers) {
@@ -328,8 +342,8 @@ export class ClaudeEngine extends EngineBase {
         const messageContainers = [
           '[data-testid="message-content"]',
           '[data-message-author-role="assistant"]',
-          '.font-claude-message',
-          '.prose',
+          ".font-claude-message",
+          ".prose",
         ];
 
         for (const selector of messageContainers) {

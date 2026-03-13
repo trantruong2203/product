@@ -411,18 +411,43 @@ export abstract class EngineBase implements IEngine {
   }
 
   /**
-   * Wait for page to be ready for input
+   * Wait for the page to be ready for input
    */
   async waitForReady(): Promise<void> {
     if (!this.page) return;
 
-    // Wait for input field to be available
-    const input = await this.findInputField();
-    if (!input) {
-      throw new Error("Input field not available");
+    // Wait for input field to be available with retries
+    let attempts = 0;
+    const maxAttempts = 5;
+
+    while (attempts < maxAttempts) {
+      try {
+        const input = await this.findInputField();
+        if (input) {
+          await this.randomDelay(500, 1000);
+          return;
+        }
+      } catch (e) {
+        console.log(`⚠️ Error finding input field: ${e}`);
+      }
+
+      attempts++;
+      if (attempts < maxAttempts) {
+        console.log(`⏳ Input field not ready, retrying... (${attempts}/${maxAttempts})`);
+        await this.randomDelay(1000, 2000);
+      }
     }
 
-    await this.randomDelay(500, 1000);
+    // Log page state before throwing error
+    try {
+      const pageUrl = this.page.url();
+      const pageTitle = await this.page.title();
+      console.log(`❌ Input field not found after ${maxAttempts} attempts. URL: ${pageUrl}, Title: ${pageTitle}`);
+    } catch (e) {
+      console.log(`❌ Input field not found after ${maxAttempts} attempts`);
+    }
+
+    throw new Error("Input field not available after retries");
   }
 
   /**

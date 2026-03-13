@@ -1,20 +1,21 @@
 services:
   postgres:
-    image: postgres:15
+    image: postgres:15-alpine
     container_name: geo-postgres
     environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: geo_saas
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-geo_saas}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-geo_saas}"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   redis:
     image: redis:7-alpine
@@ -28,6 +29,7 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
 
   api:
     build:
@@ -38,11 +40,11 @@ services:
       - "3001:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-geo_saas}?schema=public
       - JWT_SECRET=${JWT_SECRET:-9cdad47cd84f4fed321d09cc91d0b4cf74b2abced3cd47eef8c49e205cb622ab}
       - JWT_EXPIRES_IN=7d
       - REDIS_URL=redis://redis:6379
-      - FRONTEND_URL=http://localhost
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,9 +59,11 @@ services:
     container_name: geo-worker
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-geo_saas}?schema=public
       - REDIS_URL=redis://redis:6379
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
+    volumes:
+      - ./worker/chrome-profile:/app/chrome-profile
     depends_on:
       redis:
         condition: service_healthy
@@ -75,7 +79,8 @@ services:
     ports:
       - "80:80"
     depends_on:
-      - api
+      api:
+        condition: service_started
     restart: unless-stopped
 
 volumes:
