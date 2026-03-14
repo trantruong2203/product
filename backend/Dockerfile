@@ -32,6 +32,6 @@ COPY --from=builder /app/dist ./dist
 # Copy migration files
 COPY --from=builder /app/drizzle ./drizzle
 
-EXPOSE 3000
+EXPOSE 3001
 
 CMD ["npm", "start"]

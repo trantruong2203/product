@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.json",
+  "exclude": [
+    "src/engines/ChatGPTAPIEngine.ts",
+    "src/engines/ClaudeAPIEngine.ts",
+    "src/engines/GeminiAPIEngine.ts",
+    "node_modules",
+    "dist"
+  ]
+}

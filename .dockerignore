@@ -33,12 +33,14 @@ Thumbs.db
 .git
 .gitignore
 
-# Chrome profile - large and not needed in container
-worker/src/chrome-profile
-worker/chrome-profile
-worker/src/sessions
-**/chrome-profile
-**/sessions
+# Chrome profile - large and not needed in container builds
+backend/**/chrome-profile
+backend/**/sessions
+frontend/**/chrome-profile
+frontend/**/sessions
+worker/**/chrome-profile/**
+worker/**/sessions/**
+# Note: The chrome-profile directory will be mounted as a volume in docker-compose
 
 # Docker
 Dockerfile

@@ -31,13 +31,27 @@ services:
       retries: 5
     restart: unless-stopped
 
+  migrate:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: geo-migrate
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-geo_saas}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npm run migrate"
+    restart: "no"
+
   api:
     build:
       context: .
       dockerfile: ./backend/Dockerfile
     container_name: geo-api
     ports:
-      - "3001:3000"
+      - "3001:3001"
     environment:
       - NODE_ENV=production
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-geo_saas}?schema=public
@@ -45,11 +59,14 @@ services:
       - JWT_EXPIRES_IN=7d
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
+      - PORT=3001
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   worker:
@@ -63,12 +80,15 @@ services:
       - REDIS_URL=redis://redis:6379
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     volumes:
-      - ./worker/chrome-profile:/app/chrome-profile
+      - ./worker/chrome-profile:/app/chrome-profile:rw
+    shm_size: "1gb"
     depends_on:
       redis:
         condition: service_healthy
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     restart: unless-stopped
 
   frontend:
