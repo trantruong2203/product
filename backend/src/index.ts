@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { initSentry, getSentryMiddleware, getSentryErrorHandler } from './utils/sentry.js';
+import { metricsMiddleware, startMetricsCollection, getMetricsEndpoint } from './utils/metrics.js';
 import authRoutes from './routes/auth.routes';
 import projectRoutes from './routes/project.routes';
 import competitorRoutes from './routes/competitor.routes';
@@ -54,11 +55,20 @@ import { validateInput, validateRequestSize } from './middleware/inputValidation
 app.use(validateRequestSize('10mb'));
 app.use(validateInput);
 
+// Metrics middleware
+app.use(metricsMiddleware);
+
 // Attach CSRF token to all responses
 app.use(attachCsrfToken);
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Prometheus metrics endpoint
+app.get('/metrics', async (_req: Request, res: Response) => {
+  res.set('Content-Type', 'text/plain');
+  res.send(await getMetricsEndpoint());
 });
 
 app.use('/api/auth', authRoutes);
@@ -98,6 +108,13 @@ app.listen(config.port, () => {
   logger.info('Server started', `Server running on port ${config.port} in ${config.nodeEnv} mode`, {
     port: config.port,
     environment: config.nodeEnv,
+  });
+
+  // Start metrics collection
+  startMetricsCollection(10000);
+  logger.info('Metrics collection started', 'Prometheus metrics enabled', {
+    interval: '10s',
+    endpoint: '/metrics',
   });
 });
 
