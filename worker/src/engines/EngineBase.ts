@@ -191,7 +191,7 @@ export abstract class EngineBase implements IEngine {
   }
 
   /**
-   * Find the input field using multiple selector strategies
+   * Find the input field using multiple selector strategies with explicit waits
    */
   protected async findInputField(): Promise<ElementHandle | null> {
     if (!this.page) return null;
@@ -200,17 +200,20 @@ export abstract class EngineBase implements IEngine {
       ? this.selectors.input
       : [this.selectors.input];
 
+    // Try each selector with explicit wait
     for (const selector of selectors) {
       try {
+        // Wait for selector to be visible (2 second timeout per selector)
         const element = await this.page.waitForSelector(selector, {
           state: "visible",
-          timeout: 5000,
+          timeout: 2000,
         });
         if (element) {
-          console.log(`✅ Found input with selector: ${selector}`);
+          console.log(`✅ Found input field with selector: ${selector}`);
           return element;
         }
       } catch {
+        // Continue to next selector
         continue;
       }
     }
