@@ -1,6 +1,8 @@
-import express, { Request, Response, NextFunction } from 'express';
+import express, { Request, Response } from 'express';
 import cors from 'cors';
 import { config } from './config/index.js';
+import { logger } from './utils/logger.js';
+import { initSentry, getSentryMiddleware, getSentryErrorHandler } from './utils/sentry.js';
 import authRoutes from './routes/auth.routes';
 import projectRoutes from './routes/project.routes';
 import competitorRoutes from './routes/competitor.routes';
@@ -23,9 +25,15 @@ import {
   httpsRedirect,
   requestId,
 } from './middleware/security.js';
-import { attachCsrfToken, csrfProtection } from './middleware/csrf.js';
+import { attachCsrfToken } from './middleware/csrf.js';
 
 const app = express();
+
+// Initialize Sentry for error tracking
+initSentry();
+
+// Sentry request handler
+app.use(getSentryMiddleware());
 
 // Security middleware - apply first
 app.use(httpsRedirect);
@@ -69,6 +77,10 @@ app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/audit', auditRoutes);
 
+// Sentry error handler
+app.use(getSentryErrorHandler());
+
+// Custom error handler
 app.use(errorHandler);
 
 // Validate secrets before starting server
@@ -76,15 +88,18 @@ import { validateSecrets, logSecretStatus } from './utils/secrets.js';
 
 const secretValidation = validateSecrets();
 if (!secretValidation.valid) {
-  console.error('❌ Secret validation failed:');
-  secretValidation.errors.forEach(err => console.error(`  - ${err}`));
+  logger.error('Secret validation failed', new Error(secretValidation.errors.join(', ')));
   process.exit(1);
 }
 
 logSecretStatus();
 
 app.listen(config.port, () => {
-  console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);
+  logger.info('Server started', `Server running on port ${config.port} in ${config.nodeEnv} mode`, {
+    port: config.port,
+    environment: config.nodeEnv,
+  });
 });
 
 export default app;
+
