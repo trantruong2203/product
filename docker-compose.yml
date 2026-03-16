@@ -29,6 +29,20 @@ services:
       timeout: 5s
       retries: 5
 
+  migrate:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: geo-migrate
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npm run migrate"
+    restart: "no"
+
   api:
     build:
       context: .
@@ -38,8 +52,8 @@ services:
       - "3001:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - JWT_SECRET=${JWT_SECRET:-9cdad47cd84f4fed321d09cc91d0b4cf74b2abced3cd47eef8c49e205cb622ab}
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=7d
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=http://localhost
@@ -57,7 +71,7 @@ services:
     container_name: geo-worker
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
       - REDIS_URL=redis://redis:6379
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     depends_on:

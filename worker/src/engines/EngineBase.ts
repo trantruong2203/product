@@ -124,7 +124,70 @@ export abstract class EngineBase implements IEngine {
    * Hook called when already on the correct page
    */
   protected async onAlreadyOnPage(): Promise<void> {
-    // Override in subclasses if needed
+    // Default: scroll to bottom to ensure input is visible
+    if (!this.page) return;
+    await this.page.evaluate(() => {
+      window.scrollTo(0, document.body.scrollHeight);
+    });
+    await this.randomDelay(500, 1000);
+  }
+
+  /**
+   * Dismiss modals and popups (cookie banners, welcome dialogs)
+   */
+  protected async dismissModals(): Promise<void> {
+    if (!this.page) return;
+
+    const dismissSelectors = this.selectors.dismissButtons || [
+      'button:has-text("Accept")',
+      'button:has-text("Accept all")',
+      'button:has-text("I agree")',
+      'button[aria-label*="Accept"]',
+      'button[aria-label*="Close"]',
+      'button:has-text("Got it")',
+    ];
+
+    for (const selector of dismissSelectors) {
+      try {
+        const button = await this.page.$(selector);
+        if (button) {
+          await button.click();
+          await this.randomDelay(500, 1000);
+          break;
+        }
+      } catch {
+        // Ignore
+      }
+    }
+  }
+
+  /**
+   * Wait for a button to be enabled
+   */
+  protected async waitForButtonEnabled(selectors: string[]): Promise<void> {
+    if (!this.page) return;
+
+    for (const selector of selectors) {
+      try {
+        const button = await this.page.$(selector);
+        if (button) {
+          const isEnabled = await button.isEnabled();
+          if (!isEnabled) {
+            console.log("⏳ Waiting for button to be enabled...");
+            await this.page
+              .waitForFunction(
+                (btn) => btn instanceof HTMLButtonElement && btn.disabled === false,
+                await button,
+                { timeout: 5000 }
+              )
+              .catch(() => {});
+          }
+          break;
+        }
+      } catch {
+        continue;
+      }
+    }
   }
 
   /**

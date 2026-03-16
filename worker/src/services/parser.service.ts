@@ -121,7 +121,7 @@ export async function parseResponse(data: ParseResponseData): Promise<void> {
     competitorDomains,
   );
 
-  const orphanLinkRows = buildOrphanLinkCitations(
+  const orphanLinkRowsPromise = buildOrphanLinkCitations(
     responseId,
     responseText,
     brandName,
@@ -130,6 +130,7 @@ export async function parseResponse(data: ParseResponseData): Promise<void> {
     competitorDomains,
   );
 
+  const orphanLinkRows = await orphanLinkRowsPromise;
   const allRows = mentionRows.concat(orphanLinkRows);
 
   for (const row of allRows) {
@@ -220,7 +221,9 @@ async function buildOrphanLinkCitations(
       linkedBrandName: meta.linkedBrandName,
       linkedBrandType: meta.linkedBrandType,
       mentionedBrand: false,
-      confidence: 1,
+      // FIX #9: Orphan links (no explicit mention) should have lower confidence
+      // than explicit mentions. Use 0.6 instead of 1.0
+      confidence: 0.6,
       context: null,
     });
   }
@@ -270,6 +273,7 @@ function resolveLinkMetadata(
 /**
  * Perform HTTP HEAD check for all citations of a given response
  * and update isValid + httpStatus in the database.
+ * Uses Promise.allSettled() to ensure one bad link doesn't fail the entire batch.
  */
 async function validateCitationLinks(responseId: string): Promise<void> {
   const rows = await db
@@ -277,38 +281,45 @@ async function validateCitationLinks(responseId: string): Promise<void> {
     .from(citations)
     .where(eq(citations.responseId, responseId));
 
-  await Promise.all(
-    rows
-      .filter((r) => r.url)
-      .map(async (row) => {
-        let httpStatus: number | null = null;
-        let isValid = false;
+  const urlRows = rows.filter((r) => r.url);
 
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 5000);
+  const results = await Promise.allSettled(
+    urlRows.map(async (row) => {
+      let httpStatus: number | null = null;
+      let isValid = false;
 
-          const res = await fetch(row.url!, {
-            method: "HEAD",
-            signal: controller.signal,
-            redirect: "follow",
-          });
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 5000);
 
-          clearTimeout(timer);
-          httpStatus = res.status;
-          isValid = res.status >= 200 && res.status < 400;
-        } catch {
-          // timeout or network error — leave isValid=false, httpStatus=null
-        }
+        const res = await fetch(row.url!, {
+          method: "HEAD",
+          signal: controller.signal,
+          redirect: "follow",
+        });
 
-        await db
-          .update(citations)
-          .set({ isValid, httpStatus })
-          .where(eq(citations.id, row.id));
-      }),
+        clearTimeout(timer);
+        httpStatus = res.status;
+        isValid = res.status >= 200 && res.status < 400;
+      } catch (error) {
+        // timeout or network error — leave isValid=false, httpStatus=null
+        console.debug(`Link validation failed for ${row.url}:`, error instanceof Error ? error.message : 'Unknown error');
+      }
+
+      await db
+        .update(citations)
+        .set({ isValid, httpStatus })
+        .where(eq(citations.id, row.id));
+
+      return { url: row.url, isValid, httpStatus };
+    }),
   );
 
+  // Log validation summary
+  const successful = results.filter((r) => r.status === 'fulfilled').length;
+  const failed = results.filter((r) => r.status === 'rejected').length;
+
   console.log(
-    `Validated links for response ${responseId}: ${rows.filter((r) => r.url).length} URLs checked`,
+    `Validated links for response ${responseId}: ${successful} succeeded, ${failed} failed out of ${urlRows.length} URLs`,
   );
 }

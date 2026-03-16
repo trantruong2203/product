@@ -50,6 +50,12 @@ const CHATGPT_SELECTORS: EngineSelectors = {
     '[data-testid="profile-button"]',
     'button[aria-label*="User menu"]',
   ],
+  // Dismiss button selectors for modals
+  dismissButtons: [
+    'button:has-text("Accept")',
+    'button[aria-label*="Close"]',
+    'button:has-text("Got it")',
+  ],
 };
 
 const CHATGPT_OPTIONS: EngineOptions = {
@@ -78,56 +84,6 @@ export class ChatGPTEngine extends EngineBase {
   }
 
   /**
-   * Handle ChatGPT-specific modals and popups
-   */
-  private async dismissModals(): Promise<void> {
-    if (!this.page) return;
-
-    // Try to dismiss cookie banner
-    try {
-      const cookieButton = await this.page.$('button:has-text("Accept")');
-      if (cookieButton) {
-        await cookieButton.click();
-        await this.randomDelay(500, 1000);
-      }
-    } catch {
-      // Ignore
-    }
-
-    // Try to dismiss welcome modal
-    try {
-      const closeButton = await this.page.$('button[aria-label*="Close"]');
-      if (closeButton) {
-        await closeButton.click();
-        await this.randomDelay(500, 1000);
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  /**
-   * Check if we need to start a new chat
-   */
-  protected async onAlreadyOnPage(): Promise<void> {
-    if (!this.page) return;
-
-    // Check if we're on a chat page with existing conversation
-    const currentUrl = this.page.url();
-    if (currentUrl.includes('/c/')) {
-      // We're in an existing chat - optionally start new chat
-      // For now, we'll just continue with the current chat
-      console.log("📝 Continuing with existing chat");
-    }
-
-    // Scroll to bottom to ensure input is visible
-    await this.page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-    await this.randomDelay(500, 1000);
-  }
-
-  /**
    * Enhanced input finding for ChatGPT's dynamic UI
    */
   protected async findInputField(): Promise<import("playwright").ElementHandle | null> {
@@ -142,8 +98,8 @@ export class ChatGPTEngine extends EngineBase {
       const input = await this.page.evaluateHandle(() => {
         // Find the main input container
         const forms = document.querySelectorAll('form');
-        for (const form of forms) {
-          const textarea = form.querySelector('textarea, div[contenteditable="true"]');
+        for (let i = 0; i < forms.length; i++) {
+          const textarea = forms[i].querySelector('textarea, div[contenteditable="true"]');
           if (textarea) {
             return textarea;
           }
@@ -151,9 +107,10 @@ export class ChatGPTEngine extends EngineBase {
         return null;
       });
 
-      if (input && await input.isVisible()) {
+      const element = input.asElement();
+      if (element && await element?.isVisible()) {
         console.log("✅ Found input via DOM search");
-        return input.asElement();
+        return element;
       }
     } catch {
       // Ignore
@@ -191,36 +148,7 @@ export class ChatGPTEngine extends EngineBase {
     await this.humanType(prompt);
 
     // Wait for the send button to become enabled
-    await this.waitForSendButtonEnabled();
-  }
-
-  /**
-   * Wait for the send button to become enabled
-   */
-  private async waitForSendButtonEnabled(): Promise<void> {
-    if (!this.page) return;
-
-    try {
-      const sendButton = await this.page.waitForSelector('button[data-testid="send-button"], button[aria-label*="Send"]', {
-        state: "visible",
-        timeout: 5000,
-      });
-
-      if (sendButton) {
-        // Check if it's enabled
-        const isEnabled = await sendButton.isEnabled();
-        if (!isEnabled) {
-          console.log("⏳ Waiting for send button to be enabled...");
-          await this.page.waitForFunction(
-            (btn) => btn instanceof HTMLButtonElement && btn.disabled === false,
-            await sendButton,
-            { timeout: 5000 }
-          ).catch(() => {});
-        }
-      }
-    } catch {
-      // Ignore - button might not exist or we can proceed anyway
-    }
+    await this.waitForButtonEnabled(['button[data-testid="send-button"]', 'button[aria-label*="Send"]']);
   }
 
   /**
@@ -254,7 +182,8 @@ export class ChatGPTEngine extends EngineBase {
       const text = await this.page.evaluate(() => {
         const messages = document.querySelectorAll('[data-message-author-role="assistant"]');
         if (messages.length > 0) {
-          return messages[messages.length - 1].textContent || "";
+          const last = messages.item(messages.length - 1);
+          return (last?.textContent) || "";
         }
         return "";
       });

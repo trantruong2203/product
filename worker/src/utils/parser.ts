@@ -128,16 +128,20 @@ export function extractRankings(
 
 /**
  * Infer position by looking for a numbered list marker in the surrounding
- * 2 lines. Returns null if no clear marker is found — null is better than
- * a misleading guess.
+ * 2 lines. Also detects implicit rankings like "first", "second", "best", etc.
+ * Returns null if no clear marker is found — null is better than a misleading guess.
  *
  * FIX #6: Old code returned `1` any time a line contained "best/top",
  * and returned `lineIndex + 1` otherwise — both meaningless.
+ *
+ * FIX #8: Added implicit ranking detection for prose descriptions
+ * (e.g., "First option is Nike", "The best choice is Adidas")
  */
 function inferPositionFromContext(
   lines: string[],
   index: number,
 ): number | null {
+  // First, try explicit numbered list markers
   for (let offset = -1; offset <= 1; offset++) {
     const targetLine = lines[index + offset];
     if (!targetLine) continue;
@@ -146,6 +150,67 @@ function inferPositionFromContext(
     );
     if (match) return parseInt(match[1], 10);
   }
+
+  // FIX #8: Try implicit ranking detection in current line and nearby lines
+  const implicitPosition = detectImplicitRanking(lines, index);
+  if (implicitPosition !== null) return implicitPosition;
+
+  return null;
+}
+
+/**
+ * FIX #8: Detect implicit rankings from prose descriptions
+ * Examples:
+ * - "First option is Nike" → position 1
+ * - "Second best choice is Adidas" → position 2
+ * - "The best choice is Nike" → position 1
+ * - "Top recommendation is Adidas" → position 1
+ * - "Leading brand is Nike" → position 1
+ */
+function detectImplicitRanking(lines: string[], index: number): number | null {
+  // Check current line and 1 line before/after for implicit ranking keywords
+  for (let offset = -1; offset <= 1; offset++) {
+    const targetLine = lines[index + offset];
+    if (!targetLine) continue;
+
+    const normalized = normalizeText(targetLine);
+
+    // Ordinal numbers: "first", "second", "third", etc.
+    const ordinalMatch = normalized.match(
+      /\b(first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth)\b/i,
+    );
+    if (ordinalMatch) {
+      const ordinalMap: Record<string, number> = {
+        first: 1,
+        second: 2,
+        third: 3,
+        fourth: 4,
+        fifth: 5,
+        sixth: 6,
+        seventh: 7,
+        eighth: 8,
+        ninth: 9,
+        tenth: 10,
+      };
+      return ordinalMap[ordinalMatch[1].toLowerCase()] || null;
+    }
+
+    // Superlatives: "best", "top", "leading", "most recommended"
+    if (/\b(best|top|leading|most recommended|premier|superior)\b/i.test(normalized)) {
+      return 1;
+    }
+
+    // "Second best", "runner up", "alternative"
+    if (/\b(second best|runner up|alternative|next best)\b/i.test(normalized)) {
+      return 2;
+    }
+
+    // "Third best", "honorable mention"
+    if (/\b(third best|honorable mention)\b/i.test(normalized)) {
+      return 3;
+    }
+  }
+
   return null;
 }
 

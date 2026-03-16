@@ -57,6 +57,15 @@ const CLAUDE_SELECTORS: EngineSelectors = {
     'button[aria-label*="User menu"]',
     '[data-testid="sidebar"]',
   ],
+  // Dismiss button selectors for modals
+  dismissButtons: [
+    'button:has-text("Accept")',
+    'button:has-text("Accept all")',
+    'button:has-text("I agree")',
+    'button[aria-label*="Accept"]',
+    'button[aria-label*="Close"]',
+    'button:has-text("Got it")',
+  ],
 };
 
 const CLAUDE_OPTIONS: EngineOptions = {
@@ -85,64 +94,6 @@ export class ClaudeEngine extends EngineBase {
   }
 
   /**
-   * Handle Claude-specific modals and popups
-   */
-  private async dismissModals(): Promise<void> {
-    if (!this.page) return;
-
-    // Try to dismiss cookie banner
-    try {
-      const cookieButtons = [
-        'button:has-text("Accept")',
-        'button:has-text("Accept all")',
-        'button:has-text("I agree")',
-        'button[aria-label*="Accept"]',
-      ];
-
-      for (const selector of cookieButtons) {
-        const button = await this.page.$(selector);
-        if (button) {
-          await button.click();
-          await this.randomDelay(500, 1000);
-          break;
-        }
-      }
-    } catch {
-      // Ignore
-    }
-
-    // Try to dismiss welcome modal
-    try {
-      const closeButton = await this.page.$('button[aria-label*="Close"], button:has-text("Got it")');
-      if (closeButton) {
-        await closeButton.click();
-        await this.randomDelay(500, 1000);
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  /**
-   * Handle when already on page
-   */
-  protected async onAlreadyOnPage(): Promise<void> {
-    if (!this.page) return;
-
-    // Check if we need to start a new chat
-    const currentUrl = this.page.url();
-    if (currentUrl.includes('/c/')) {
-      console.log("📝 Continuing with existing chat");
-    }
-
-    // Scroll to bottom to ensure input is visible
-    await this.page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-    await this.randomDelay(500, 1000);
-  }
-
-  /**
    * Enhanced input finding for Claude's dynamic UI
    */
   protected async findInputField(): Promise<import("playwright").ElementHandle | null> {
@@ -157,8 +108,8 @@ export class ClaudeEngine extends EngineBase {
       const input = await this.page.evaluateHandle(() => {
         // Find the main input container
         const forms = document.querySelectorAll('form');
-        for (const form of forms) {
-          const textarea = form.querySelector('textarea, div[contenteditable="true"]');
+        for (let i = 0; i < forms.length; i++) {
+          const textarea = forms[i].querySelector('textarea, div[contenteditable="true"]');
           if (textarea) {
             return textarea;
           }
@@ -176,9 +127,10 @@ export class ClaudeEngine extends EngineBase {
         return null;
       });
 
-      if (input && await input.isVisible()) {
+      const element = input.asElement();
+      if (element && await element?.isVisible()) {
         console.log("✅ Found input via DOM search");
-        return input.asElement();
+        return element;
       }
     } catch {
       // Ignore
@@ -216,32 +168,7 @@ export class ClaudeEngine extends EngineBase {
     await this.humanType(prompt);
 
     // Wait for the send button to become enabled
-    await this.waitForSendButtonEnabled();
-  }
-
-  /**
-   * Wait for the send button to become enabled
-   */
-  private async waitForSendButtonEnabled(): Promise<void> {
-    if (!this.page) return;
-
-    try {
-      const sendButton = await this.page.$('button[aria-label*="Send"], button[type="submit"]');
-      if (sendButton) {
-        // Check if it's enabled
-        const isEnabled = await sendButton.isEnabled();
-        if (!isEnabled) {
-          console.log("⏳ Waiting for send button to be enabled...");
-          await this.page.waitForFunction(
-            (btn) => btn instanceof HTMLButtonElement && btn.disabled === false,
-            await sendButton,
-            { timeout: 5000 }
-          ).catch(() => {});
-        }
-      }
-    } catch {
-      // Ignore - button might not exist or we can proceed anyway
-    }
+    await this.waitForButtonEnabled(['button[aria-label*="Send"]', 'button[type="submit"]']);
   }
 
   /**
@@ -281,10 +208,12 @@ export class ClaudeEngine extends EngineBase {
           '.prose',
         ];
 
-        for (const selector of messageContainers) {
+        for (let i = 0; i < messageContainers.length; i++) {
+          const selector = messageContainers[i];
           const elements = document.querySelectorAll(selector);
           if (elements.length > 0) {
-            return elements[elements.length - 1].textContent || "";
+            const last = elements.item(elements.length - 1);
+            return (last?.textContent) || "";
           }
         }
         return "";
@@ -332,10 +261,12 @@ export class ClaudeEngine extends EngineBase {
           '.prose',
         ];
 
-        for (const selector of messageContainers) {
+        for (let i = 0; i < messageContainers.length; i++) {
+          const selector = messageContainers[i];
           const elements = document.querySelectorAll(selector);
           if (elements.length > 0) {
-            return elements[elements.length - 1].innerHTML || "";
+            const last = elements.item(elements.length - 1);
+            return (last?.innerHTML) || "";
           }
         }
         return "";

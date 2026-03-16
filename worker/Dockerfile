@@ -12,6 +12,8 @@ COPY worker .
 
 RUN npm run build
 
+ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=0
+
 RUN npx playwright install --with-deps chromium
 
 EXPOSE 3000

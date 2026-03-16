@@ -66,6 +66,14 @@ const GEMINI_SELECTORS: EngineSelectors = {
     'button[aria-label*="account"]',
     'nav:has(a[href*="gemini"])',
   ],
+  // Dismiss button selectors for modals
+  dismissButtons: [
+    'button:has-text("Accept all")',
+    'button:has-text("Accept")',
+    'button:has-text("I agree")',
+    'button[aria-label*="Close"]',
+    'button:has-text("Got it")',
+  ],
 };
 
 const GEMINI_OPTIONS: EngineOptions = {
@@ -95,57 +103,6 @@ export class GeminiEngine extends EngineBase {
   }
 
   /**
-   * Handle Gemini-specific modals and popups
-   */
-  private async dismissModals(): Promise<void> {
-    if (!this.page) return;
-
-    // Try to dismiss cookie banner
-    try {
-      const cookieButtons = [
-        'button:has-text("Accept all")',
-        'button:has-text("Accept")',
-        'button:has-text("I agree")',
-      ];
-
-      for (const selector of cookieButtons) {
-        const button = await this.page.$(selector);
-        if (button) {
-          await button.click();
-          await this.randomDelay(500, 1000);
-          break;
-        }
-      }
-    } catch {
-      // Ignore
-    }
-
-    // Try to dismiss welcome modal
-    try {
-      const closeButton = await this.page.$('button[aria-label*="Close"], button:has-text("Got it")');
-      if (closeButton) {
-        await closeButton.click();
-        await this.randomDelay(500, 1000);
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  /**
-   * Handle when already on page
-   */
-  protected async onAlreadyOnPage(): Promise<void> {
-    if (!this.page) return;
-
-    // Scroll to bottom to ensure input is visible
-    await this.page.evaluate(() => {
-      window.scrollTo(0, document.body.scrollHeight);
-    });
-    await this.randomDelay(500, 1000);
-  }
-
-  /**
    * Enhanced input finding for Gemini's dynamic UI
    */
   protected async findInputField(): Promise<import("playwright").ElementHandle | null> {
@@ -160,13 +117,13 @@ export class GeminiEngine extends EngineBase {
       const input = await this.page.evaluateHandle(() => {
         // Gemini uses a textarea inside a form
         const forms = document.querySelectorAll('form');
-        for (const form of forms) {
-          const textarea = form.querySelector('textarea');
+        for (let i = 0; i < forms.length; i++) {
+          const textarea = forms[i].querySelector('textarea');
           if (textarea) {
             return textarea;
           }
           // Also check for contenteditable divs
-          const editable = form.querySelector('div[contenteditable="true"]');
+          const editable = forms[i].querySelector('div[contenteditable="true"]');
           if (editable) {
             return editable;
           }
@@ -174,9 +131,10 @@ export class GeminiEngine extends EngineBase {
         return null;
       });
 
-      if (input && await input.isVisible()) {
+      const element = input.asElement();
+      if (element && await element?.isVisible()) {
         console.log("✅ Found input via DOM search");
-        return input.asElement();
+        return element;
       }
     } catch {
       // Ignore
@@ -231,96 +189,14 @@ export class GeminiEngine extends EngineBase {
     }
 
     // Wait for the submit button to become enabled
-    await this.waitForSubmitButtonEnabled();
+    const submitSelectors = Array.isArray(this.selectors.submit)
+      ? this.selectors.submit.filter((s): s is string => s !== undefined)
+      : this.selectors.submit ? [this.selectors.submit] : [];
+    await this.waitForButtonEnabled(submitSelectors);
   }
 
   /**
-   * Wait for the submit button to become enabled
-   */
-  private async waitForSubmitButtonEnabled(): Promise<void> {
-    if (!this.page) return;
-
-    try {
-      const submitSelectors = Array.isArray(this.selectors.submit)
-        ? this.selectors.submit
-        : [this.selectors.submit];
-
-      for (const selector of submitSelectors) {
-        try {
-          const button = await this.page.$(selector);
-          if (button) {
-            const isEnabled = await button.isEnabled();
-            if (!isEnabled) {
-              console.log("⏳ Waiting for submit button to be enabled...");
-              await this.page.waitForFunction(
-                (btn) => btn instanceof HTMLButtonElement && btn.disabled === false,
-                await button,
-                { timeout: 5000 }
-              ).catch(() => {});
-            }
-            break;
-          }
-        } catch {
-          continue;
-        }
-      }
-    } catch {
-      // Ignore
-    }
-  }
-
-  /**
-   * Enhanced response extraction for Gemini
-   */
-  protected async extractResponseText(): Promise<string> {
-    if (!this.page) return "";
-
-    const selectors = Array.isArray(this.selectors.response)
-      ? this.selectors.response
-      : [this.selectors.response];
-
-    for (const selector of selectors) {
-      try {
-        const responses = await this.page.$$(selector);
-        if (responses.length > 0) {
-          // Get the last response
-          const last = responses[responses.length - 1];
-          const text = await last.textContent();
-          if (text && text.length > 50) {
-            return text;
-          }
-        }
-      } catch {
-        continue;
-      }
-    }
-
-    // Fallback: Try to get text from the most recent message
-    try {
-      const text = await this.page.evaluate(() => {
-        // Try various message container patterns
-        const messageContainers = [
-          '[data-test-id*="conversation-turn-3"]',
-          '.model-response',
-          '.markdown',
-        ];
-
-        for (const selector of messageContainers) {
-          const elements = document.querySelectorAll(selector);
-          if (elements.length > 0) {
-            return elements[elements.length - 1].textContent || "";
-          }
-        }
-        return "";
-      });
-      return text;
-    } catch {
-      return "";
-    }
-  }
-
-  /**
-   * Enhanced submit for Gemini
+   * Enhanced submit for Gemini (uses button click instead of Enter)
    */
   protected async submitPrompt(): Promise<void> {
     if (!this.page) return;
@@ -335,7 +211,7 @@ export class GeminiEngine extends EngineBase {
 
     for (const selector of submitSelectors) {
       try {
-        const button = await this.page.waitForSelector(selector, {
+        const button = await this.page.waitForSelector(selector as string, {
           state: "visible",
           timeout: 3000,
         });
@@ -361,5 +237,56 @@ export class GeminiEngine extends EngineBase {
     }
 
     await this.randomDelay(this.options.submitWait!, this.options.submitWait! + 500);
+  }
+
+  /**
+   * Enhanced response extraction for Gemini
+   */
+  protected async extractResponseText(): Promise<string> {
+    if (!this.page) return "";
+
+    const selectors = Array.isArray(this.selectors.response)
+      ? this.selectors.response
+      : [this.selectors.response];
+
+    for (const selector of selectors) {
+      try {
+        const responses = await this.page.$$(selector as string);
+        if (responses.length > 0) {
+          // Get the last response
+          const last = responses[responses.length - 1];
+          const text = await last.textContent();
+          if (text && text.length > 50) {
+            return text;
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    // Fallback: Try to get text from the most recent message
+    try {
+      const text = await this.page.evaluate(() => {
+        // Try various message container patterns
+        const messageContainers: string[] = [
+          '[data-test-id*="conversation-turn-3"]',
+          '.model-response',
+          '.markdown',
+        ];
+
+        for (const selector of messageContainers) {
+          const elements = document.querySelectorAll(selector);
+          if (elements.length > 0) {
+            const last = elements.item(elements.length - 1);
+            return (last?.textContent) || "";
+          }
+        }
+        return "";
+      });
+      return text;
+    } catch {
+      return "";
+    }
   }
 }

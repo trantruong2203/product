@@ -32,10 +32,6 @@ export interface SoMSeriesRow {
     responses: number;
   };
   brands: SoMBrandRow[];
-  totals: {
-    mentionsAllBrands: number;
-    responses: number;
-  };
 }
 
 export interface GetSoMResponse {
