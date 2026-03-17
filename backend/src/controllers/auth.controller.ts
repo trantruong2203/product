@@ -4,6 +4,7 @@ import jwt, { SignOptions } from 'jsonwebtoken';
 import { users } from '../db/schema.js';
 import { eq } from 'drizzle-orm';
 import { config } from '../config/index.js';
+import { logger } from '../utils/logger.js';
 import { AppError } from '../middleware/errorHandler.js';
 import type { RegisterInput, LoginInput } from '../validations/index.js';
 import type { AuthRequest } from '../middleware/authenticate.js';
@@ -25,6 +26,10 @@ export const register = async (
     });
 
     if (existingUser) {
+      logger.warn('User registration failed', 'Email already registered', {
+        email,
+        ipAddress: getClientIp(req),
+      });
       logSecurityEvent({
         type: 'LOGIN_FAILED',
         email,
@@ -52,6 +57,12 @@ export const register = async (
     });
 
     const token = generateToken(user.id, user.email);
+
+    logger.info('User registered', `New user created: ${user.email}`, {
+      userId: user.id,
+      email: user.email,
+      ipAddress: getClientIp(req),
+    });
 
     logSecurityEvent({
       type: 'LOGIN_SUCCESS',
@@ -89,6 +100,10 @@ export const login = async (
 
     if (!user) {
       recordFailedLogin(email);
+      logger.warn('Login failed', 'User not found', {
+        email,
+        ipAddress: getClientIp(req),
+      });
       logSecurityEvent({
         type: 'LOGIN_FAILED',
         email,
@@ -105,6 +120,11 @@ export const login = async (
 
     if (!isPasswordValid) {
       recordFailedLogin(email);
+      logger.warn('Login failed', 'Invalid password', {
+        userId: user.id,
+        email,
+        ipAddress: getClientIp(req),
+      });
       logSecurityEvent({
         type: 'LOGIN_FAILED',
         userId: user.id,
@@ -122,6 +142,12 @@ export const login = async (
     clearLoginAttempts(email);
 
     const token = generateToken(user.id, user.email);
+
+    logger.info('User logged in', `User login successful: ${email}`, {
+      userId: user.id,
+      email,
+      ipAddress: getClientIp(req),
+    });
 
     logSecurityEvent({
       type: 'LOGIN_SUCCESS',
@@ -161,6 +187,12 @@ export const logout = async (
       blacklistToken(token);
     }
 
+    logger.info('User logged out', `User logout: ${req.user?.email}`, {
+      userId: req.user?.id,
+      email: req.user?.email,
+      ipAddress: getClientIp(req),
+    });
+
     logSecurityEvent({
       type: 'LOGOUT',
       userId: req.user?.id,
@@ -191,6 +223,11 @@ export const refreshToken = async (
     }
 
     const newToken = generateToken(req.user.id, req.user.email);
+
+    logger.debug('Token refreshed', `Token refresh for user: ${req.user.email}`, {
+      userId: req.user.id,
+      email: req.user.email,
+    });
 
     logSecurityEvent({
       type: 'TOKEN_REFRESH',
