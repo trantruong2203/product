@@ -326,6 +326,10 @@ async function validateCitationLinks(responseId: string): Promise<void> {
   const successful = results.filter((r) => r.status === 'fulfilled').length;
   const failed = results.filter((r) => r.status === 'rejected').length;
 
+  // Log validation summary
+  const successful = results.filter((r) => r.status === 'fulfilled').length;
+  const failed = results.filter((r) => r.status === 'rejected').length;
+
   console.log(
     `Validated links for response ${responseId}: ${urlRows.length} URLs checked`,
   );

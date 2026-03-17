@@ -59,6 +59,20 @@ services:
     command: sh -c "npm run migrate"
     restart: "no"
 
+  migrate:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: geo-migrate
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npm run migrate"
+    restart: "no"
+
   api:
     build:
       context: .
@@ -68,8 +82,8 @@ services:
       - "3001:3001"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-geo_saas}?schema=public
-      - JWT_SECRET=${JWT_SECRET:-9cdad47cd84f4fed321d09cc91d0b4cf74b2abced3cd47eef8c49e205cb622ab}
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+      - JWT_SECRET=${JWT_SECRET}
       - JWT_EXPIRES_IN=7d
       - REDIS_URL=redis://redis:6379
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost}
@@ -90,7 +104,11 @@ services:
     container_name: geo-worker
     environment:
       - NODE_ENV=production
+<<<<<<< HEAD
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-geo_saas}?schema=public
+=======
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+>>>>>>> 3cb5dc7 (feat: Implement comprehensive security hardening (Phase 1))
       - REDIS_URL=redis://redis:6379
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     volumes:
