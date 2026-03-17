@@ -3,6 +3,7 @@ import cors from 'cors';
 import { config } from './config/index.js';
 import { logger } from './utils/logger.js';
 import { initSentry, getSentryMiddleware, getSentryErrorHandler } from './utils/sentry.js';
+<<<<<<< HEAD
 import { metricsMiddleware, startMetricsCollection, getMetricsEndpoint } from './utils/metrics.js';
 import authRoutes from './routes/auth.routes';
 import projectRoutes from './routes/project.routes';
