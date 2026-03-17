@@ -66,6 +66,14 @@ const GEMINI_SELECTORS: EngineSelectors = {
     'button[aria-label*="account"]',
     'nav:has(a[href*="gemini"])',
   ],
+  // Dismiss button selectors for modals
+  dismissButtons: [
+    'button:has-text("Accept all")',
+    'button:has-text("Accept")',
+    'button:has-text("I agree")',
+    'button[aria-label*="Close"]',
+    'button:has-text("Got it")',
+  ],
 };
 
 const GEMINI_OPTIONS: EngineOptions = {
@@ -172,7 +180,7 @@ export class GeminiEngine extends EngineBase {
             return textarea;
           }
           // Also check for contenteditable divs
-          const editable = form.querySelector('div[contenteditable="true"]');
+          const editable = forms[i].querySelector('div[contenteditable="true"]');
           if (editable) {
             return editable;
           }
@@ -238,7 +246,10 @@ export class GeminiEngine extends EngineBase {
     }
 
     // Wait for the submit button to become enabled
-    await this.waitForSubmitButtonEnabled();
+    const submitSelectors = Array.isArray(this.selectors.submit)
+      ? this.selectors.submit.filter((s): s is string => s !== undefined)
+      : this.selectors.submit ? [this.selectors.submit] : [];
+    await this.waitForButtonEnabled(submitSelectors);
   }
 
   /**
@@ -347,7 +358,7 @@ export class GeminiEngine extends EngineBase {
     for (const selector of submitSelectors) {
       if (!selector) continue;
       try {
-        const button = await this.page.waitForSelector(selector, {
+        const button = await this.page.waitForSelector(selector as string, {
           state: "visible",
           timeout: 3000,
         });

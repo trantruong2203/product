@@ -1,7 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import db from "../db/index.js";
 import { projects, competitors, prompts } from "../db/schema.js";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler.js";
 import type { AuthRequest } from "../middleware/authenticate.js";
 import { generateAIPrompts } from "../services/aiPromptGenerator.js";
@@ -86,41 +86,61 @@ export const getProjects = async (
   try {
     const userId = req.user!.id;
 
+    // Single query with aggregation instead of N+1
     const projectsList = await db
       .select()
       .from(projects)
       .where(eq(projects.userId, userId))
       .orderBy(desc(projects.createdAt));
 
-    const projectsWithCounts = await Promise.all(
-      projectsList.map(async (project) => {
-        const promptsList = await db
-          .select()
-          .from(prompts)
-          .where(eq(prompts.projectId, project.id));
-        const competitorsList = await db
-          .select()
-          .from(competitors)
-          .where(eq(competitors.projectId, project.id));
+    // Fetch all related data in parallel (not nested)
+    const projectIds = projectsList.map(p => p.id);
 
-        const recentPrompts = await db
-          .select()
-          .from(prompts)
-          .where(eq(prompts.projectId, project.id))
-          .limit(5)
-          .orderBy(desc(prompts.createdAt));
+    const [promptsData, competitorsData] = await Promise.all([
+      db.select().from(prompts).where(
+        inArray(prompts.projectId, projectIds)
+      ),
+      db.select().from(competitors).where(
+        inArray(competitors.projectId, projectIds)
+      ),
+    ]);
 
-        return {
-          ...project,
-          _count: {
-            prompts: promptsList.length,
-            competitors: competitorsList.length,
-            runs: 0,
-          },
-          prompts: recentPrompts,
-        };
-      }),
-    );
+    // Build lookup maps
+    const promptsByProject = new Map<string, typeof prompts.$inferSelect[]>();
+    const competitorsByProject = new Map<string, typeof competitors.$inferSelect[]>();
+
+    promptsData.forEach(p => {
+      if (!promptsByProject.has(p.projectId)) {
+        promptsByProject.set(p.projectId, []);
+      }
+      promptsByProject.get(p.projectId)!.push(p);
+    });
+
+    competitorsData.forEach(c => {
+      if (!competitorsByProject.has(c.projectId)) {
+        competitorsByProject.set(c.projectId, []);
+      }
+      competitorsByProject.get(c.projectId)!.push(c);
+    });
+
+    // Build response with counts
+    const projectsWithCounts = projectsList.map(project => {
+      const projectPrompts = promptsByProject.get(project.id) || [];
+      const projectCompetitors = competitorsByProject.get(project.id) || [];
+      const recentPrompts = projectPrompts
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 5);
+
+      return {
+        ...project,
+        _count: {
+          prompts: projectPrompts.length,
+          competitors: projectCompetitors.length,
+          runs: 0,
+        },
+        prompts: recentPrompts,
+      };
+    });
 
     res.json({
       success: true,

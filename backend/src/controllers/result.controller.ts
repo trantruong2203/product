@@ -8,7 +8,7 @@ import db, {
   citations,
   competitors,
 } from "../db/index.js";
-import { eq, and, desc, asc, gte } from "drizzle-orm";
+import { eq, and, desc, asc, gte, inArray } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler.js";
 import type { AuthRequest } from "../middleware/authenticate.js";
 
@@ -125,37 +125,57 @@ export const getProjectResults = async (
       .orderBy(desc(runs.finishedAt))
       .limit(200);
 
-    // Hydrate runs with responses + citations
-    const runsWithDetails: RunRow[] = await Promise.all(
-      runsData.map(async (r) => {
-        const responsesData = await db
-          .select()
-          .from(responses)
-          .where(eq(responses.runId, r.Run.id as string));
+    // Hydrate runs with responses + citations - OPTIMIZED: fetch all at once, not nested
+    const runIds = runsData.map(r => r.Run.id);
 
-        const responsesWithCitations: ResponseRow[] = await Promise.all(
-          responsesData.map(async (resp) => {
-            const citationsData = await db
-              .select()
-              .from(citations)
-              .where(eq(citations.responseId, resp.id));
-            return {
-              id: resp.id,
-              runId: resp.runId,
-              citations: citationsData as CitationRow[],
-            };
-          }),
-        );
+    // Fetch all responses for all runs in one query
+    const allResponses = await db
+      .select()
+      .from(responses)
+      .where(inArray(responses.runId, runIds));
 
-        return {
-          id: r.Run.id,
-          promptId: r.Run.promptId,
-          engineId: r.Run.engineId,
-          finishedAt: r.Run.finishedAt,
-          responses: responsesWithCitations,
-        };
-      }),
-    );
+    // Fetch all citations for all responses in one query
+    const responseIds = allResponses.map(r => r.id);
+    const allCitations = await db
+      .select()
+      .from(citations)
+      .where(inArray(citations.responseId, responseIds));
+
+    // Build lookup maps
+    const responsesByRunId = new Map<string, typeof responses.$inferSelect[]>();
+    const citationsByResponseId = new Map<string, CitationRow[]>();
+
+    allResponses.forEach(resp => {
+      if (!responsesByRunId.has(resp.runId)) {
+        responsesByRunId.set(resp.runId, []);
+      }
+      responsesByRunId.get(resp.runId)!.push(resp);
+    });
+
+    allCitations.forEach(cit => {
+      if (!citationsByResponseId.has(cit.responseId)) {
+        citationsByResponseId.set(cit.responseId, []);
+      }
+      citationsByResponseId.get(cit.responseId)!.push(cit as CitationRow);
+    });
+
+    // Build runs with details from maps (no queries)
+    const runsWithDetails: RunRow[] = runsData.map(r => {
+      const runResponses = responsesByRunId.get(r.Run.id) || [];
+      const responsesWithCitations: ResponseRow[] = runResponses.map(resp => ({
+        id: resp.id,
+        runId: resp.runId,
+        citations: citationsByResponseId.get(resp.id) || [],
+      }));
+
+      return {
+        id: r.Run.id,
+        promptId: r.Run.promptId,
+        engineId: r.Run.engineId,
+        finishedAt: r.Run.finishedAt,
+        responses: responsesWithCitations,
+      };
+    });
 
     // All citations for main brand (textual mentions only)
     const brandCitations: CitationRow[] = runsWithDetails.flatMap((run) =>
@@ -206,6 +226,29 @@ export const getProjectResults = async (
     // ── FIX #2: promptCoverage — % of prompts mentioned at least once (same set) ──
     const promptCoverage = citationRate; // Same concept, kept separate for clarity/future divergence
 
+    // ── FIX #11: Share of Voice (SoV) — competitive benchmarking ──
+    // Calculate SoV: brand_citations / (brand_citations + competitor_citations) × 100
+    const competitorCitations = runsWithDetails.flatMap((run) =>
+      run.responses.flatMap((resp) =>
+        resp.citations.filter(
+          (c) =>
+            !c.mentionedBrandIsPrimary && // Not the main brand
+            c.mentionedBrand && // But is a mentioned brand (not orphan link)
+            competitorNames.some(
+              (compName) =>
+                c.mentionedBrandName &&
+                c.mentionedBrandName.toLowerCase() === compName.toLowerCase(),
+            ),
+        ),
+      ),
+    );
+
+    const totalBrandAndCompetitorCitations = brandCitations.length + competitorCitations.length;
+    const shareOfVoice =
+      totalBrandAndCompetitorCitations > 0
+        ? (brandCitations.length / totalBrandAndCompetitorCitations) * 100
+        : 0;
+
     // ── FIX #3: avgPosition + exponential decay score ──
     const positionedCitations = brandCitations.filter(
       (c) => c.position !== null,
@@ -227,24 +270,34 @@ export const getProjectResults = async (
         ? Math.min(100, (weightedTotal / maxPossibleWeight) * 100)
         : 0;
 
-    // ── Final visibility score (updated weights) ──
+    // ── FIX #12: Replace promptCoverage with mention frequency ──
+    // Mention frequency = average mentions per prompt
+    const mentionFrequency =
+      totalPrompts > 0 ? (brandCitations.length / totalPrompts) : 0;
+
+    // ── Final visibility score (updated weights with SoV) ──
+    // FIX #11: Added SoV (20% weight) for competitive benchmarking
+    // FIX #12: Replaced promptCoverage with mention frequency
     const visibilityScore =
-      citationRate * 0.35 +
-      promptCoverage * 0.25 +
+      citationRate * 0.25 +
+      mentionFrequency * 0.20 +
       avgPositionScore * 0.25 +
-      confidenceScore * 0.15;
+      confidenceScore * 0.15 +
+      shareOfVoice * 0.15;
 
     res.json({
       success: true,
       data: {
         visibilityScore: Math.round(visibilityScore * 100) / 100,
         citationRate: Math.round(citationRate * 100) / 100,
-        promptCoverage: Math.round(promptCoverage * 100) / 100,
+        mentionFrequency: Math.round(mentionFrequency * 100) / 100,
         avgPosition: Math.round(avgPosition * 100) / 100,
         avgPositionScore: Math.round(avgPositionScore * 100) / 100,
         confidenceScore: Math.round(confidenceScore * 100) / 100,
+        shareOfVoice: Math.round(shareOfVoice * 100) / 100,
         totalRuns: runsWithDetails.length,
         totalCitations: brandCitations.length,
+        competitorCitations: competitorCitations.length,
         recentRuns: runsWithDetails.slice(0, 10),
       },
     });
@@ -422,36 +475,57 @@ export const getCompetitorComparison = async (
         ),
       );
 
-    const runsWithResponses: RunRow[] = await Promise.all(
-      runsData.map(async (r) => {
-        const responsesData = await db
-          .select()
-          .from(responses)
-          .where(eq(responses.runId, r.Run.id as string));
+    // Hydrate runs with responses + citations - OPTIMIZED: fetch all at once, not nested
+    const runIds2 = runsData.map(r => r.Run.id);
 
-        const responsesWithCitations: ResponseRow[] = await Promise.all(
-          responsesData.map(async (resp) => {
-            const citationsData = await db
-              .select()
-              .from(citations)
-              .where(eq(citations.responseId, resp.id));
-            return {
-              id: resp.id,
-              runId: resp.runId,
-              citations: citationsData as CitationRow[],
-            };
-          }),
-        );
+    // Fetch all responses for all runs in one query
+    const allResponses2 = await db
+      .select()
+      .from(responses)
+      .where(inArray(responses.runId, runIds2));
 
-        return {
-          id: r.Run.id,
-          promptId: r.Run.promptId,
-          engineId: r.Run.engineId,
-          finishedAt: r.Run.finishedAt,
-          responses: responsesWithCitations,
-        };
-      }),
-    );
+    // Fetch all citations for all responses in one query
+    const responseIds2 = allResponses2.map(r => r.id);
+    const allCitations2 = await db
+      .select()
+      .from(citations)
+      .where(inArray(citations.responseId, responseIds2));
+
+    // Build lookup maps
+    const responsesByRunId2 = new Map<string, typeof responses.$inferSelect[]>();
+    const citationsByResponseId2 = new Map<string, CitationRow[]>();
+
+    allResponses2.forEach(resp => {
+      if (!responsesByRunId2.has(resp.runId)) {
+        responsesByRunId2.set(resp.runId, []);
+      }
+      responsesByRunId2.get(resp.runId)!.push(resp);
+    });
+
+    allCitations2.forEach(cit => {
+      if (!citationsByResponseId2.has(cit.responseId)) {
+        citationsByResponseId2.set(cit.responseId, []);
+      }
+      citationsByResponseId2.get(cit.responseId)!.push(cit as CitationRow);
+    });
+
+    // Build runs with details from maps (no queries)
+    const runsWithResponses: RunRow[] = runsData.map(r => {
+      const runResponses = responsesByRunId2.get(r.Run.id) || [];
+      const responsesWithCitations: ResponseRow[] = runResponses.map(resp => ({
+        id: resp.id,
+        runId: resp.runId,
+        citations: citationsByResponseId2.get(resp.id) || [],
+      }));
+
+      return {
+        id: r.Run.id,
+        promptId: r.Run.promptId,
+        engineId: r.Run.engineId,
+        finishedAt: r.Run.finishedAt,
+        responses: responsesWithCitations,
+      };
+    });
 
     const countCitations = (
       brandNameOrDomain: string,

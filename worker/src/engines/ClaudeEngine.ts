@@ -57,6 +57,15 @@ const CLAUDE_SELECTORS: EngineSelectors = {
     'button[aria-label*="User menu"]',
     '[data-testid="sidebar"]',
   ],
+  // Dismiss button selectors for modals
+  dismissButtons: [
+    'button:has-text("Accept")',
+    'button:has-text("Accept all")',
+    'button:has-text("I agree")',
+    'button[aria-label*="Accept"]',
+    'button[aria-label*="Close"]',
+    'button:has-text("Got it")',
+  ],
 };
 
 const CLAUDE_OPTIONS: EngineOptions = {
@@ -295,10 +304,12 @@ export class ClaudeEngine extends EngineBase {
           ".prose",
         ];
 
-        for (const selector of messageContainers) {
+        for (let i = 0; i < messageContainers.length; i++) {
+          const selector = messageContainers[i];
           const elements = document.querySelectorAll(selector);
           if (elements.length > 0) {
-            return elements[elements.length - 1].textContent || "";
+            const last = elements.item(elements.length - 1);
+            return (last?.textContent) || "";
           }
         }
         return "";
@@ -346,10 +357,12 @@ export class ClaudeEngine extends EngineBase {
           ".prose",
         ];
 
-        for (const selector of messageContainers) {
+        for (let i = 0; i < messageContainers.length; i++) {
+          const selector = messageContainers[i];
           const elements = document.querySelectorAll(selector);
           if (elements.length > 0) {
-            return elements[elements.length - 1].innerHTML || "";
+            const last = elements.item(elements.length - 1);
+            return (last?.innerHTML) || "";
           }
         }
         return "";

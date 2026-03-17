@@ -8,6 +8,9 @@ import { AppError } from '../middleware/errorHandler.js';
 import type { RegisterInput, LoginInput } from '../validations/index.js';
 import type { AuthRequest } from '../middleware/authenticate.js';
 import { db } from '../db/index.js';
+import { recordFailedLogin, clearLoginAttempts } from '../middleware/accountLockout.js';
+import { blacklistToken, generateToken } from '../middleware/authenticate.js';
+import { logSecurityEvent, getClientIp } from '../utils/securityAudit.js';
 
 export const register = async (
   req: Request<{}, {}, RegisterInput>,
@@ -22,6 +25,15 @@ export const register = async (
     });
 
     if (existingUser) {
+      logSecurityEvent({
+        type: 'LOGIN_FAILED',
+        email,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        endpoint: '/api/auth/register',
+        details: { reason: 'Email already registered' },
+        severity: 'MEDIUM',
+      });
       throw new AppError('Email already registered', 400);
     }
 
@@ -39,15 +51,17 @@ export const register = async (
       createdAt: users.createdAt,
     });
 
-    const jwtOptions: SignOptions = {
-      expiresIn: config.jwt.expiresIn as `${number}d`,
-    };
+    const token = generateToken(user.id, user.email);
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      config.jwt.secret,
-      jwtOptions
-    );
+    logSecurityEvent({
+      type: 'LOGIN_SUCCESS',
+      userId: user.id,
+      email: user.email,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      endpoint: '/api/auth/register',
+      severity: 'LOW',
+    });
 
     res.status(201).json({
       success: true,
@@ -74,24 +88,50 @@ export const login = async (
     });
 
     if (!user) {
+      recordFailedLogin(email);
+      logSecurityEvent({
+        type: 'LOGIN_FAILED',
+        email,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        endpoint: '/api/auth/login',
+        details: { reason: 'User not found' },
+        severity: 'MEDIUM',
+      });
       throw new AppError('Invalid credentials', 401);
     }
 
     const isPasswordValid = await bcrypt.compare(password, user.password);
 
     if (!isPasswordValid) {
+      recordFailedLogin(email);
+      logSecurityEvent({
+        type: 'LOGIN_FAILED',
+        userId: user.id,
+        email,
+        ipAddress: getClientIp(req),
+        userAgent: req.headers['user-agent'],
+        endpoint: '/api/auth/login',
+        details: { reason: 'Invalid password' },
+        severity: 'MEDIUM',
+      });
       throw new AppError('Invalid credentials', 401);
     }
 
-    const jwtOptions: SignOptions = {
-      expiresIn: config.jwt.expiresIn as `${number}d`,
-    };
+    // Clear login attempts on successful login
+    clearLoginAttempts(email);
 
-    const token = jwt.sign(
-      { userId: user.id, email: user.email },
-      config.jwt.secret,
-      jwtOptions
-    );
+    const token = generateToken(user.id, user.email);
+
+    logSecurityEvent({
+      type: 'LOGIN_SUCCESS',
+      userId: user.id,
+      email,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      endpoint: '/api/auth/login',
+      severity: 'LOW',
+    });
 
     res.json({
       success: true,
@@ -103,6 +143,69 @@ export const login = async (
           plan: user.plan,
         },
         token,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const logout = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const token = (req as any).token;
+    if (token) {
+      blacklistToken(token);
+    }
+
+    logSecurityEvent({
+      type: 'LOGOUT',
+      userId: req.user?.id,
+      email: req.user?.email,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      endpoint: '/api/auth/logout',
+      severity: 'LOW',
+    });
+
+    res.json({
+      success: true,
+      message: 'Logged out successfully',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+export const refreshToken = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    if (!req.user) {
+      throw new AppError('Not authenticated', 401);
+    }
+
+    const newToken = generateToken(req.user.id, req.user.email);
+
+    logSecurityEvent({
+      type: 'TOKEN_REFRESH',
+      userId: req.user.id,
+      email: req.user.email,
+      ipAddress: getClientIp(req),
+      userAgent: req.headers['user-agent'],
+      endpoint: '/api/auth/refresh',
+      severity: 'LOW',
+    });
+
+    res.json({
+      success: true,
+      data: {
+        token: newToken,
       },
     });
   } catch (error) {
@@ -138,3 +241,4 @@ export const getMe = async (
     next(error);
   }
 };
+

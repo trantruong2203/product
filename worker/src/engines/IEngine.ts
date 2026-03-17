@@ -27,6 +27,8 @@ export interface EngineSelectors {
   loginButton?: string | string[];
   /** Element that indicates user is logged in */
   loggedInIndicator?: string | string[];
+  /** Dismiss button selectors for modals/popups (cookie banners, welcome dialogs) */
+  dismissButtons?: string[];
 }
 
 export interface EngineOptions {

@@ -45,6 +45,20 @@ services:
     command: sh -c "npm run migrate"
     restart: "no"
 
+  migrate:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: geo-migrate
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npm run migrate"
+    restart: "no"
+
   api:
     build:
       context: .
