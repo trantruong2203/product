@@ -12,6 +12,7 @@ RUN npm ci
 COPY backend/src ./src
 COPY backend/test ./test
 COPY backend/tsconfig.json ./
+COPY backend/drizzle.config.json ./
 
 # Expose port
 EXPOSE 3001
