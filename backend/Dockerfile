@@ -1,5 +1,4 @@
-# Build stage
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -7,31 +6,15 @@ WORKDIR /app
 COPY backend/package*.json ./
 
 # Install dependencies
-RUN npm install
+RUN npm ci
 
 # Copy source code
-COPY backend/ ./
+COPY backend/src ./src
+COPY backend/test ./test
+COPY backend/tsconfig.json ./
 
-# Build the application
-RUN npm run build
-
-# Production stage
-FROM node:20-alpine
-
-WORKDIR /app
-
-# Copy package files for production
-COPY backend/package*.json ./
-
-# Install only production dependencies
-RUN npm install --omit=dev
-
-# Copy built assets from builder stage
-COPY --from=builder /app/dist ./dist
-
-# Copy migration files
-COPY --from=builder /app/drizzle ./drizzle
-
+# Expose port
 EXPOSE 3001
 
-CMD ["npm", "start"]
+# Default command
+CMD ["npm", "run", "dev"]

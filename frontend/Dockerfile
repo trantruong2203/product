@@ -1,5 +1,4 @@
-# Build stage
-FROM node:20-alpine AS build
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -10,20 +9,14 @@ COPY frontend/package*.json ./
 RUN npm ci
 
 # Copy source code
-COPY frontend/ ./
+COPY frontend/src ./src
+COPY frontend/index.html ./
+COPY frontend/vite.config.ts ./
+COPY frontend/tsconfig.json ./
+COPY frontend/tsconfig.node.json ./
 
-# Build the application
-RUN npm run build
+# Expose port
+EXPOSE 5173
 
-# Production stage
-FROM nginx:alpine
-
-# Copy built assets from build stage
-COPY --from=build /app/dist /usr/share/nginx/html
-
-# Copy nginx config
-COPY frontend/nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+# Default command
+CMD ["npm", "run", "dev", "--", "--host"]

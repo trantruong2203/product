@@ -1,35 +1,20 @@
-# Build stage
-FROM node:20-alpine AS builder
-
-WORKDIR /app
-
-COPY worker/package*.json ./
-RUN npm install
-
-COPY worker/ ./
-
-RUN npx tsc --project tsconfig.build.json
-
-
-# Production stage
-FROM mcr.microsoft.com/playwright:v1.58.2-jammy
+FROM mcr.microsoft.com/playwright:v1.40.0-focal
 
 WORKDIR /app
 
 # Copy package files
 COPY worker/package*.json ./
 
-# Install production deps
-RUN npm install --omit=dev
+# Install dependencies
+RUN npm ci
 
-# Copy build output
-COPY --from=builder /app/dist ./dist
+# Copy source code
+COPY worker/src ./src
+COPY worker/test ./test
+COPY worker/tsconfig.json ./
 
-# Install Playwright browsers (image đã có dependencies)
-RUN npx playwright install chromium
+# Create chrome profile directory
+RUN mkdir -p /app/chrome-profile
 
-# Set browser path and skip runtime download
-ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
-ENV PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
-
-CMD ["node", "dist/index.js"]
+# Default command
+CMD ["npm", "run", "dev"]
