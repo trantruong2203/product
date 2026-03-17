@@ -1,5 +1,7 @@
 import axios from "axios";
 
+// Use relative path for API calls - Nginx will proxy to backend
+// This ensures HTTP is used in development/Docker, HTTPS in production
 const API_URL = "/api";
 
 const api = axios.create({
@@ -7,6 +9,8 @@ const api = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  // Allow credentials for CORS
+  withCredentials: true,
 });
 
 api.interceptors.request.use((config) => {

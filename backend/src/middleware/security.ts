@@ -63,9 +63,16 @@ export const apiLimiter = rateLimit({
 
 /**
  * HTTPS redirect middleware
+ * Only redirect in production with proper x-forwarded-proto header
+ * Skip in development/Docker to allow HTTP
  */
 export const httpsRedirect = (req: Request, res: Response, next: NextFunction) => {
-  if (process.env.NODE_ENV === 'production' && req.header('x-forwarded-proto') !== 'https') {
+  // Only enforce HTTPS in production AND when behind a reverse proxy (x-forwarded-proto header present)
+  if (
+    process.env.NODE_ENV === 'production' &&
+    req.header('x-forwarded-proto') &&
+    req.header('x-forwarded-proto') !== 'https'
+  ) {
     return res.redirect(301, `https://${req.header('host')}${req.url}`);
   }
   next();
