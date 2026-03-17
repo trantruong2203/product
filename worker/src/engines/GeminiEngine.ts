@@ -388,4 +388,58 @@ export class GeminiEngine extends EngineBase {
       this.options.submitWait! + 500,
     );
   }
+<<<<<<< HEAD
+=======
+
+  /**
+   * Enhanced response extraction for Gemini
+   */
+  protected async extractResponseText(): Promise<string> {
+    if (!this.page) return "";
+
+    const selectors = Array.isArray(this.selectors.response)
+      ? this.selectors.response
+      : [this.selectors.response];
+
+    for (const selector of selectors) {
+      try {
+        const responses = await this.page.$$(selector as string);
+        if (responses.length > 0) {
+          // Get the last response
+          const last = responses[responses.length - 1];
+          const text = await last.textContent();
+          if (text && text.length > 50) {
+            return text;
+          }
+        }
+      } catch {
+        continue;
+      }
+    }
+
+    // Fallback: Try to get text from the most recent message
+    try {
+      const text = await this.page.evaluate(() => {
+        // Try various message container patterns
+        const messageContainers: string[] = [
+          '[data-test-id*="conversation-turn-3"]',
+          '.model-response',
+          '.markdown',
+        ];
+
+        for (const selector of messageContainers) {
+          const elements = document.querySelectorAll(selector);
+          if (elements.length > 0) {
+            const last = elements.item(elements.length - 1);
+            return (last?.textContent) || "";
+          }
+        }
+        return "";
+      });
+      return text;
+    } catch {
+      return "";
+    }
+  }
+>>>>>>> 59e9582b1f32fc024ae566a8810b04a49d0cb015
 }

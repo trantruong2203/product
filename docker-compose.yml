@@ -59,6 +59,20 @@ services:
     command: sh -c "npm run migrate"
     restart: "no"
 
+  migrate:
+    build:
+      context: .
+      dockerfile: ./backend/Dockerfile
+    container_name: geo-migrate
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: sh -c "npm run migrate"
+    restart: "no"
+
   api:
     build:
       context: .
@@ -90,7 +104,11 @@ services:
     container_name: geo-worker
     environment:
       - NODE_ENV=production
+<<<<<<< HEAD
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-geo_saas}?schema=public
+=======
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/geo_saas
+>>>>>>> 59e9582b1f32fc024ae566a8810b04a49d0cb015
       - REDIS_URL=redis://redis:6379
       - PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
     volumes:
