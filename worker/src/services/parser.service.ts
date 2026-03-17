@@ -283,7 +283,7 @@ async function validateCitationLinks(responseId: string): Promise<void> {
     .where(eq(citations.responseId, responseId));
 
   const urlRows = rows.filter((r) => r.url);
-  
+
   if (urlRows.length === 0) {
     console.log(`No URLs to validate for response ${responseId}`);
     return;
@@ -293,26 +293,29 @@ async function validateCitationLinks(responseId: string): Promise<void> {
   const BATCH_SIZE = 10;
   for (let i = 0; i < urlRows.length; i += BATCH_SIZE) {
     const batch = urlRows.slice(i, i + BATCH_SIZE);
-    
-    await Promise.all(
+
+    const results = await Promise.allSettled(
       batch.map(async (row) => {
         let httpStatus: number | null = null;
         let isValid = false;
 
-  const results = await Promise.allSettled(
-    urlRows.map(async (row) => {
-      let httpStatus: number | null = null;
-      let isValid = false;
+        try {
+          const controller = new AbortController();
+          const timer = setTimeout(() => controller.abort(), 5000);
 
-      try {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), 5000);
+          const res = await fetch(row.url!, {
+            method: "HEAD",
+            signal: controller.signal,
+            redirect: "follow",
+          });
 
-        const res = await fetch(row.url!, {
-          method: "HEAD",
-          signal: controller.signal,
-          redirect: "follow",
-        });
+          httpStatus = res.status;
+          isValid = res.ok;
+          clearTimeout(timer);
+        } catch (error) {
+          // URL validation failed
+          isValid = false;
+        }
 
         await db
           .update(citations)
@@ -320,15 +323,14 @@ async function validateCitationLinks(responseId: string): Promise<void> {
           .where(eq(citations.id, row.id));
       }),
     );
+
+    // Log batch validation summary
+    const successful = results.filter((r) => r.status === 'fulfilled').length;
+    const failed = results.filter((r) => r.status === 'rejected').length;
+    console.log(
+      `Validated batch ${Math.floor(i / BATCH_SIZE) + 1}: ${successful} successful, ${failed} failed`,
+    );
   }
-
-  // Log validation summary
-  const successful = results.filter((r) => r.status === 'fulfilled').length;
-  const failed = results.filter((r) => r.status === 'rejected').length;
-
-  // Log validation summary
-  const successful = results.filter((r) => r.status === 'fulfilled').length;
-  const failed = results.filter((r) => r.status === 'rejected').length;
 
   console.log(
     `Validated links for response ${responseId}: ${urlRows.length} URLs checked`,

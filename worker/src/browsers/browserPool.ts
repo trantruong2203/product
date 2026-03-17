@@ -159,7 +159,7 @@ export class BrowserPool {
     console.log(`   🌐 Locale: ${locale}`);
 
     // Enhanced stealth launch options
-    const context = await chromium.launchPersistentContext(userDataDir, {
+    const launchOptions = {
       headless: true,
       args: [
         "--no-sandbox",

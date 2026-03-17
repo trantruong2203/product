@@ -88,7 +88,7 @@ export class ChatGPTEngine extends EngineBase {
   /**
    * Handle ChatGPT-specific modals and popups
    */
-  private async dismissModals(): Promise<void> {
+  protected async dismissModals(): Promise<void> {
     if (!this.page) return;
 
     // Try to dismiss cookie banner

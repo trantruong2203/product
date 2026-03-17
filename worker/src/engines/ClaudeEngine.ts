@@ -98,7 +98,7 @@ export class ClaudeEngine extends EngineBase {
   /**
    * Handle Claude-specific modals and popups
    */
-  private async dismissModals(): Promise<void> {
+  protected async dismissModals(): Promise<void> {
     if (!this.page) return;
 
     // Try to dismiss cookie banner

@@ -107,7 +107,7 @@ export class GeminiEngine extends EngineBase {
   /**
    * Handle Gemini-specific modals and popups
    */
-  private async dismissModals(): Promise<void> {
+  protected async dismissModals(): Promise<void> {
     if (!this.page) return;
 
     // Try to dismiss cookie banner
@@ -180,7 +180,7 @@ export class GeminiEngine extends EngineBase {
             return textarea;
           }
           // Also check for contenteditable divs
-          const editable = forms[i].querySelector('div[contenteditable="true"]');
+          const editable = form.querySelector('div[contenteditable="true"]');
           if (editable) {
             return editable;
           }
