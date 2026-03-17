@@ -223,8 +223,8 @@ export default function Dashboard() {
                     setNewProject({ ...newProject, language: e.target.value })
                   }
                 >
-                  <option value="vi">Tiếng Việt</option>
-                  <option value="en">English</option>
+                  <option value="en">{t("common.languages.english")}</option>
+                  <option value="vi">{t("common.languages.vietnamese")}</option>
                 </select>
               </div>
               <div className="form-group">

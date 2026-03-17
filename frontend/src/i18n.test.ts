@@ -3,7 +3,7 @@ import i18n from './i18n';
 
 describe('i18n setup', () => {
   test('starts with configured default language', () => {
-    expect(i18n.language).toBe('vi');
+    expect(i18n.language).toBe('en');
   });
 
   test('resolves known keys in both languages', async () => {

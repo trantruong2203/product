@@ -1,4 +1,11 @@
 {
+  "common": {
+    "language": "Language",
+    "languages": {
+      "english": "English",
+      "vietnamese": "Vietnamese"
+    }
+  },
   "app": {
     "loading": "Loading..."
   },
