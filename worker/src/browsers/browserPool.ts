@@ -94,6 +94,31 @@ function getRandomLocale(): string {
   return locales[Math.floor(Math.random() * locales.length)];
 }
 
+function removeChromiumSingletonLocks(userDataDir: string): void {
+  const lockFiles = ["SingletonLock", "SingletonCookie", "SingletonSocket"];
+  for (const file of lockFiles) {
+    const filePath = path.join(userDataDir, file);
+    try {
+      if (fs.existsSync(filePath)) {
+        fs.rmSync(filePath, { force: true });
+      }
+    } catch {
+      // Ignore lock cleanup errors; launch retry may still work.
+    }
+  }
+}
+
+function resetEngineProfile(userDataDir: string): void {
+  try {
+    if (fs.existsSync(userDataDir)) {
+      fs.rmSync(userDataDir, { recursive: true, force: true });
+    }
+    fs.mkdirSync(userDataDir, { recursive: true });
+  } catch (error) {
+    console.warn("⚠️ Failed to reset engine profile directory:", error);
+  }
+}
+
 export class BrowserPool {
   private contexts: Map<string, BrowserContext> = new Map();
   private browser?: Browser;
@@ -181,7 +206,32 @@ export class BrowserPool {
         Connection: "keep-alive",
         "Upgrade-Insecure-Requests": "1",
       },
-    });
+    };
+
+    let context: BrowserContext;
+    try {
+      context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+    } catch (error) {
+      console.warn(
+        `⚠️ First launch failed for ${engine}, retrying with cleaned lock files...`,
+      );
+      removeChromiumSingletonLocks(userDataDir);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      try {
+        context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+      } catch (retryError) {
+        console.warn(
+          `⚠️ Second launch failed for ${engine}, resetting profile and retrying...`,
+        );
+        // Profile may be corrupted on local Windows runs. Reset only this engine profile.
+        resetEngineProfile(userDataDir);
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        context = await chromium.launchPersistentContext(
+          userDataDir,
+          launchOptions,
+        );
+      }
+    }
 
     // Inject additional stealth scripts
     await this.injectStealthScripts(context);

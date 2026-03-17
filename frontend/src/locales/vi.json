@@ -1,4 +1,11 @@
 {
+  "common": {
+    "language": "Ngôn ngữ",
+    "languages": {
+      "english": "Tiếng Anh",
+      "vietnamese": "Tiếng Việt"
+    }
+  },
   "app": {
     "loading": "Đang tải..."
   },

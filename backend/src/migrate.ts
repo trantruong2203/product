@@ -3,6 +3,8 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
 import { config } from './config/index.js';
 
+dotenv.config();
+
 async function runMigration() {
   const pool = new Pool({
     connectionString: config.database.url,

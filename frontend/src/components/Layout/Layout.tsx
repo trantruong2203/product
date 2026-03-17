@@ -1,6 +1,7 @@
 import { Link, Outlet } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { User } from '../../types';
+import LanguageSwitcher from '../LanguageSwitcher';
 
 interface LayoutProps {
   user: User;
@@ -22,6 +23,7 @@ export default function Layout({ user, onLogout }: LayoutProps) {
           </nav>
         </div>
         <div className="header-right">
+          <LanguageSwitcher />
           <span className="user-email">{user.email}</span>
           <button onClick={onLogout} className="btn-logout">
             {t('layout.logout')}
@@ -77,6 +79,20 @@ export default function Layout({ user, onLogout }: LayoutProps) {
         }
         .user-email {
           color: #888;
+        }
+        .language-switcher {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #ccc;
+          font-size: 0.9rem;
+        }
+        .language-switcher select {
+          background: #2a2a2a;
+          color: #fff;
+          border: 1px solid #444;
+          border-radius: 4px;
+          padding: 0.35rem 0.5rem;
         }
         .btn-logout {
           background: #ff4444;

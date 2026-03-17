@@ -16,6 +16,11 @@ import type { AuthRequest } from "../middleware/authenticate.js";
 const projectsAlias = alias(projects, "project");
 const promptsAlias = alias(prompts, "prompt");
 const aiEnginesAlias = alias(aiEngines, "engine");
+const DEFAULT_ENGINES = [
+  { name: "ChatGPT", domain: "chatgpt.com" },
+  { name: "Gemini", domain: "gemini.google.com" },
+  { name: "Claude", domain: "claude.ai" },
+] as const;
 
 export const triggerRun = async (
   req: AuthRequest,
@@ -72,10 +77,36 @@ export const triggerRun = async (
         .select()
         .from(aiEngines)
         .where(eq(aiEngines.isActive, true));
+
+      // Fresh Docker database can start with an empty AIEngine table.
+      // Bootstrap default engines on first run so scans work out of the box.
+      if (engines.length === 0) {
+        const existingEngines = await db.select({ id: aiEngines.id }).from(aiEngines);
+        if (existingEngines.length === 0) {
+          for (const engine of DEFAULT_ENGINES) {
+            await db
+              .insert(aiEngines)
+              .values({
+                name: engine.name,
+                domain: engine.domain,
+                isActive: true,
+              })
+              .onConflictDoNothing();
+          }
+
+          engines = await db
+            .select()
+            .from(aiEngines)
+            .where(eq(aiEngines.isActive, true));
+        }
+      }
     }
 
     if (engines.length === 0) {
-      throw new AppError("No valid engines found", 400);
+      throw new AppError(
+        "No active engines found. Please enable at least one engine.",
+        400,
+      );
     }
 
     const jobs = [];

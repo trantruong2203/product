@@ -7,6 +7,7 @@ import { runs } from "./db/schema.js";
 import { eq } from "drizzle-orm";
 
 const redisUrl = new URL(config.redis.url);
+const workerConcurrency = Number(process.env.WORKER_CONCURRENCY || "1");
 const connection = {
   host: redisUrl.hostname || "localhost",
   port: parseInt(redisUrl.port, 10) || 6379,
@@ -20,12 +21,18 @@ const runPromptWorker = new Worker<RunPromptJobData>(
   },
   {
     connection,
-    concurrency: 2,
+    concurrency: Number.isFinite(workerConcurrency) && workerConcurrency > 0
+      ? workerConcurrency
+      : 1,
     limiter: {
       max: 10,
       duration: 1000,
     },
   },
+);
+
+console.log(
+  `Worker started (concurrency=${Number.isFinite(workerConcurrency) && workerConcurrency > 0 ? workerConcurrency : 1}), waiting for jobs...`,
 );
 
 runPromptWorker.on("completed", (job) => {
@@ -70,4 +77,3 @@ process.on("SIGINT", async () => {
   process.exit(0);
 });
 
-console.log("Worker started, waiting for jobs...");
