@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { authAPI } from '../services/api';
 import { User } from '../types';
+import LanguageSwitcher from '../components/LanguageSwitcher';
 
 interface RegisterProps {
   onLogin: (user: User, token: string) => void;
@@ -38,6 +39,9 @@ export default function Register({ onLogin }: RegisterProps) {
   return (
     <div className="auth-page">
       <div className="auth-card">
+        <div className="auth-top-actions">
+          <LanguageSwitcher />
+        </div>
         <h1>GEO SaaS</h1>
         <h2>{t('auth.register.title')}</h2>
         {error && <div className="error">{error}</div>}
@@ -96,6 +100,25 @@ export default function Register({ onLogin }: RegisterProps) {
           text-align: center;
           color: #646cff;
           margin-bottom: 0.5rem;
+        }
+        .auth-top-actions {
+          display: flex;
+          justify-content: flex-end;
+          margin-bottom: 0.75rem;
+        }
+        .language-switcher {
+          display: flex;
+          align-items: center;
+          gap: 0.5rem;
+          color: #ccc;
+          font-size: 0.85rem;
+        }
+        .language-switcher select {
+          background: #1a1a1a;
+          color: #fff;
+          border: 1px solid #444;
+          border-radius: 4px;
+          padding: 0.35rem 0.5rem;
         }
         .auth-card h2 {
           text-align: center;

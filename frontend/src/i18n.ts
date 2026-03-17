@@ -8,12 +8,19 @@ const resources = {
   vi: { translation: vi }
 };
 
+const hasWindow = globalThis.window !== undefined;
+const savedLanguage = hasWindow
+  ? globalThis.window.localStorage.getItem('language')
+  : null;
+const defaultLanguage = savedLanguage === 'vi' || savedLanguage === 'en' ? savedLanguage : 'en';
+
 i18n
   .use(initReactI18next)
   .init({
     resources,
-    lng: 'vi',
+    lng: defaultLanguage,
     fallbackLng: 'en',
+    supportedLngs: ['en', 'vi'],
     interpolation: {
       escapeValue: false
     }

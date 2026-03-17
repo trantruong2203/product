@@ -1,7 +1,10 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { migrate } from "drizzle-orm/node-postgres/migrator";
 import { Client } from "pg";
+import dotenv from "dotenv";
 import * as schema from "./db/schema";
+
+dotenv.config();
 
 async function runMigration() {
   try {
