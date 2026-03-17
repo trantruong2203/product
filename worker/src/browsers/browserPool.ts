@@ -1,26 +1,7 @@
 import { BrowserContext, Browser } from "playwright";
-import { chromium } from "playwright-extra";
-import stealth from "puppeteer-extra-plugin-stealth";
-import anonymizeUA from "puppeteer-extra-plugin-anonymize-ua";
-import recaptcha from "puppeteer-extra-plugin-recaptcha";
+import { chromium } from "playwright";
 import * as path from "path";
 import * as fs from "fs";
-
-// Enable stealth plugins
-chromium.use(stealth());
-chromium.use(anonymizeUA());
-
-// Enable reCAPTCHA solver (requires API key for auto-solve)
-// For manual solve, it will show the captcha for user to solve
-chromium.use(
-  recaptcha({
-    provider: {
-      id: "2captcha",
-      token: process.env.RECAPTCHA_API_KEY || "", // Set your 2Captcha API key in .env
-    },
-    visualFeedback: true,
-  }),
-);
 
 const profileDir = path.join(process.cwd(), "chrome-profile");
 

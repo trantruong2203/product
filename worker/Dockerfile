@@ -6,7 +6,13 @@ WORKDIR /app
 COPY worker/package*.json ./
 
 # Install dependencies
-RUN npm ci
+RUN npm install
+
+# Copy the pre-installed browsers from the image to where npm expects them
+RUN mkdir -p /root/.cache/ms-playwright && \
+    cp -r /ms-playwright/chromium-1091 /root/.cache/ms-playwright/ && \
+    cp -r /ms-playwright/firefox-1440 /root/.cache/ms-playwright/ && \
+    cp -r /ms-playwright/webkit-1968 /root/.cache/ms-playwright/ || true
 
 # Copy source code
 COPY worker/src ./src
