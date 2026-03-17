@@ -50,6 +50,12 @@ const CHATGPT_SELECTORS: EngineSelectors = {
     '[data-testid="profile-button"]',
     'button[aria-label*="User menu"]',
   ],
+  // Dismiss button selectors for modals
+  dismissButtons: [
+    'button:has-text("Accept")',
+    'button[aria-label*="Close"]',
+    'button:has-text("Got it")',
+  ],
 };
 
 const CHATGPT_OPTIONS: EngineOptions = {
@@ -269,7 +275,8 @@ export class ChatGPTEngine extends EngineBase {
           '[data-message-author-role="assistant"]',
         );
         if (messages.length > 0) {
-          return messages[messages.length - 1].textContent || "";
+          const last = messages.item(messages.length - 1);
+          return (last?.textContent) || "";
         }
         return "";
       });

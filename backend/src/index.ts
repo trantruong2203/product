@@ -17,8 +17,21 @@ import recommendationRoutes from './routes/recommendation.routes';
 import dashboardRoutes from './routes/dashboard.routes';
 import geoRoutes from './routes/geo.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
+import {
+  securityHeaders,
+  globalLimiter,
+  httpsRedirect,
+  requestId,
+} from './middleware/security.js';
+import { attachCsrfToken, csrfProtection } from './middleware/csrf.js';
 
 const app = express();
+
+// Security middleware - apply first
+app.use(httpsRedirect);
+app.use(securityHeaders);
+app.use(requestId);
+app.use(globalLimiter);
 
 app.use(cors({
   origin: config.cors.origin,
@@ -27,6 +40,14 @@ app.use(cors({
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+
+// Input validation middleware
+import { validateInput, validateRequestSize } from './middleware/inputValidation.js';
+app.use(validateRequestSize('10mb'));
+app.use(validateInput);
+
+// Attach CSRF token to all responses
+app.use(attachCsrfToken);
 
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
@@ -49,6 +70,18 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/geo', geoRoutes);
 
 app.use(errorHandler);
+
+// Validate secrets before starting server
+import { validateSecrets, logSecretStatus } from './utils/secrets.js';
+
+const secretValidation = validateSecrets();
+if (!secretValidation.valid) {
+  console.error('❌ Secret validation failed:');
+  secretValidation.errors.forEach(err => console.error(`  - ${err}`));
+  process.exit(1);
+}
+
+logSecretStatus();
 
 app.listen(config.port, () => {
   console.log(`Server running on port ${config.port} in ${config.nodeEnv} mode`);

@@ -8,6 +8,13 @@
       "when": 1773162640211,
       "tag": "0000_blue_sunspot",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1773483696707,
+      "tag": "0001_flippant_shaman",
+      "breakpoints": true
     }
   ]
 }
