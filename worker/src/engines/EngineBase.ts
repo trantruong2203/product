@@ -142,23 +142,45 @@ export abstract class EngineBase implements IEngine {
       'button:has-text("Accept")',
       'button:has-text("Accept all")',
       'button:has-text("I agree")',
+      'button:has-text("Allow")',
       'button[aria-label*="Accept"]',
+      'button[aria-label*="Decline"]',
       'button[aria-label*="Close"]',
       'button:has-text("Got it")',
+      'button:has-text("OK")',
+      'button:has-text("Dismiss")',
+      '[role="dialog"] button',
+      '.modal button',
     ];
 
     for (const selector of dismissSelectors) {
       try {
         const button = await this.page.$(selector);
-        if (button) {
+        if (button && await button.isVisible()) {
           await button.click();
           await this.randomDelay(500, 1000);
+          console.log(`[Engine] Dismissed modal: ${selector}`);
           break;
         }
       } catch {
         // Ignore
       }
     }
+  }
+
+  /**
+   * Scroll page to bottom to ensure input is visible
+   */
+  protected async scrollToBottom(): Promise<void> {
+    if (!this.page) return;
+    
+    await this.page.evaluate(() => {
+      window.scrollTo({
+        top: document.body.scrollHeight,
+        behavior: "smooth"
+      });
+    });
+    await this.randomDelay(500, 1000);
   }
 
   /**
@@ -191,17 +213,44 @@ export abstract class EngineBase implements IEngine {
   }
 
   /**
-   * Find the input field using multiple selector strategies with explicit waits
+   * Find the input field using multiple selector strategies with fallback
    */
   protected async findInputField(): Promise<ElementHandle | null> {
     if (!this.page) return null;
 
-    const selectors = Array.isArray(this.selectors.input)
+    // Get engine-specific selectors first
+    const engineSelectors = Array.isArray(this.selectors.input)
       ? this.selectors.input
       : [this.selectors.input];
 
+    // Build comprehensive selector list with priority ordering
+    const allSelectors = [
+      // Engine-specific selectors first
+      ...engineSelectors,
+      // Contenteditable elements (ChatGPT, Claude)
+      'div[contenteditable="true"][role="textbox"]',
+      'div[contenteditable="true"][aria-label*="message"]',
+      'div[contenteditable="true"][aria-label*="chat"]',
+      'div[contenteditable="true"][aria-label*="input"]',
+      'div[contenteditable="true"][data-id]',
+      // Textarea elements (Gemini, Perplexity)
+      'textarea[placeholder*="essage"]',       // "message" fuzzy match
+      'textarea[placeholder*="rompt"]',         // "prompt" fuzzy match
+      'textarea[aria-label*="message"]',
+      'textarea[aria-label*="input"]',
+      'textarea[aria-label*="rompt"]',
+      'textarea[id*="prompt"]',
+      'textarea[id*="input"]',
+      'textarea[id*="chat"]',
+      '#prompt-textarea',                      // Gemini specific
+      'form textarea',
+      // Generic fallback
+      'textarea',
+      '[contenteditable="true"]',
+    ];
+
     // Try each selector with explicit wait
-    for (const selector of selectors) {
+    for (const selector of allSelectors) {
       try {
         // Wait for selector to be visible (2 second timeout per selector)
         const element = await this.page.waitForSelector(selector, {
@@ -209,7 +258,7 @@ export abstract class EngineBase implements IEngine {
           timeout: 2000,
         });
         if (element) {
-          console.log(`✅ Found input field with selector: ${selector}`);
+          console.log(`[Engine] Found input field with selector: ${selector}`);
           return element;
         }
       } catch {
@@ -218,6 +267,16 @@ export abstract class EngineBase implements IEngine {
       }
     }
 
+    // Last resort: look for any visible contenteditable or textarea
+    try {
+      const fallback = await this.page.$('textarea, [contenteditable="true"]');
+      if (fallback && await fallback.isVisible()) {
+        console.log(`[Engine] Found input with fallback selector`);
+        return fallback;
+      }
+    } catch {}
+
+    console.warn(`[Engine] Could not find input field for ${this.name}`);
     return null;
   }
 
@@ -290,12 +349,15 @@ export abstract class EngineBase implements IEngine {
   }
 
   /**
-   * Wait for the response to complete
+   * Wait for the response to complete with improved detection
    */
   protected async waitForResponse(): Promise<void> {
     if (!this.page) return;
 
-    console.log("⏳ Waiting for response...");
+    console.log("[Engine] Waiting for response...");
+
+    // First, dismiss any modals/popups that might block the response
+    await this.dismissModals();
 
     const selectors = Array.isArray(this.selectors.response)
       ? this.selectors.response
@@ -316,15 +378,36 @@ export abstract class EngineBase implements IEngine {
     }
 
     if (!responseElement) {
-      throw new Error("No response element found");
+      throw new Error("No response element found after timeout");
     }
+
+    console.log("[Engine] Response element detected, waiting for completion...");
 
     // Wait for streaming to finish
     await this.waitForStreamingFinish();
   }
 
   /**
-   * Wait for streaming response to finish
+   * Scroll input field into view to ensure it's visible
+   */
+  protected async scrollInputIntoView(inputElement: ElementHandle): Promise<void> {
+    if (!this.page) return;
+    
+    try {
+      await inputElement.evaluate((el: HTMLElement) => {
+        el.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      });
+      await this.randomDelay(300, 500);
+    } catch (e) {
+      console.log(`[Engine] Could not scroll input into view: ${e}`);
+    }
+  }
+
+  /**
+   * Wait for streaming response to finish with improved detection
    */
   protected async waitForStreamingFinish(): Promise<void> {
     if (!this.page) return;
@@ -335,15 +418,39 @@ export abstract class EngineBase implements IEngine {
 
     let lastLength = 0;
     let stableCount = 0;
+    let isStillGenerating = true;
     const STABLE_REQUIRED = 3;
     const MIN_LENGTH = 50;
+    const MAX_WAIT_SECONDS = 120;  // Extended from 60 to 120 for longer responses
 
-    for (let i = 0; i < 60; i++) {
+    console.log(`[Engine] Waiting for response completion (max ${MAX_WAIT_SECONDS}s)...`);
+
+    for (let i = 0; i < MAX_WAIT_SECONDS; i++) {
       await this.page.waitForTimeout(1000);
 
       let foundResponse = false;
       let currentLength = 0;
 
+      // Check for loading indicators first
+      const loadingSelectors = [
+        '[class*="loading"]',
+        '[class*="generating"]',
+        '[class*="streaming"]',
+        '[class*="typing"]',
+        '[data-testid*="generating"]',
+      ];
+
+      for (const loadingSelector of loadingSelectors) {
+        try {
+          const loadingEl = await this.page.$(loadingSelector);
+          if (loadingEl && await loadingEl.isVisible()) {
+            isStillGenerating = true;
+            break;
+          }
+        } catch {}
+      }
+
+      // Get current response length
       for (const selector of selectors) {
         try {
           const responses = await this.page.$$(selector);
@@ -364,16 +471,26 @@ export abstract class EngineBase implements IEngine {
         continue;
       }
 
+      // Check if response is stable
       if (currentLength === lastLength && currentLength >= MIN_LENGTH) {
         stableCount++;
-        if (stableCount >= STABLE_REQUIRED) {
+        if (stableCount >= STABLE_REQUIRED && !isStillGenerating) {
+          console.log(`[Engine] Response stable after ${i + 1} iterations (${currentLength} chars)`);
           return;
         }
       } else {
         stableCount = 0;
         lastLength = currentLength;
+        
+        // If we detect growth, extend the wait
+        if (currentLength > lastLength) {
+          // Reset generating flag when we see updates
+          isStillGenerating = false;
+        }
       }
     }
+
+    console.warn(`[Engine] Response wait timeout after ${MAX_WAIT_SECONDS}s, last length: ${lastLength}`);
   }
 
   /**
@@ -527,16 +644,56 @@ export abstract class EngineBase implements IEngine {
   }
 
   /**
-   * Type text with human-like delays
+   * Type text with enhanced human-like delays
    */
   protected async humanType(text: string): Promise<void> {
     if (!this.page) return;
 
-    for (const char of text) {
-      await this.page.keyboard.type(char, { delay: this.randomInt(10, 50) });
+    const chars = text.split("");
+    let lastPause = Date.now();
+    let totalChars = chars.length;
 
-      // Occasional longer pauses
-      if (Math.random() < 0.05) {
+    for (let i = 0; i < totalChars; i++) {
+      const char = chars[i];
+
+      if (char === " ") {
+        // Space: small delay
+        await this.page.keyboard.press("Space");
+        await this.randomDelay(30, 150);
+      } else if (char === "\n") {
+        // Newline: moderate delay
+        await this.page.keyboard.press("Enter");
+        await this.randomDelay(50, 200);
+      } else {
+        // Regular character with variable delay
+        await this.page.keyboard.type(char, { delay: this.randomInt(10, 80) });
+
+        // Occasional longer pauses (2% chance)
+        if (Math.random() < 0.02 && Date.now() - lastPause > 1000) {
+          await this.randomDelay(200, 500);
+          lastPause = Date.now();
+        }
+      }
+
+      // Simulate editing: occasionally delete and retype part of the text
+      // This happens every 50 characters with 15% probability
+      if (i > 0 && i % 50 === 0 && Math.random() < 0.15) {
+        const deleteCount = this.randomInt(5, 20);
+        const charsToDelete = Math.min(deleteCount, i);
+        
+        // Select and delete
+        await this.page.keyboard.down("Shift");
+        for (let j = 0; j < charsToDelete; j++) {
+          await this.page.keyboard.press("ArrowLeft");
+        }
+        await this.page.keyboard.up("Shift");
+        await this.page.keyboard.press("Backspace");
+        
+        // Retype a portion
+        const startIdx = Math.max(0, i - charsToDelete);
+        const partialText = text.substring(startIdx, i);
+        await this.page.keyboard.type(partialText, { delay: this.randomInt(5, 30) });
+        
         await this.randomDelay(100, 300);
       }
     }

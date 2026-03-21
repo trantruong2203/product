@@ -24,6 +24,20 @@ export interface Mention {
   position: number | null;
   confidence: number;
   context: string;
+  contextLines?: string[];  // Extended: array of surrounding lines
+}
+
+/**
+ * Extract surrounding lines for context (used in parser.service.ts)
+ */
+export function extractContextLines(
+  lines: string[],
+  index: number,
+  radius: number = 2
+): string[] {
+  const start = Math.max(0, index - radius);
+  const end = Math.min(lines.length, index + radius + 1);
+  return lines.slice(start, end);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -88,6 +102,7 @@ export function detectBrandMentions(
       position,
       confidence,
       context: origLine,
+      contextLines: extractContextLines(originalLines, i, 2),
     });
   }
 

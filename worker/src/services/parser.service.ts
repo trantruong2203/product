@@ -274,8 +274,38 @@ function resolveLinkMetadata(
 /**
  * Perform HTTP HEAD check for all citations of a given response
  * and update isValid + httpStatus in the database.
- * Optimized with batch updates and controlled concurrency.
+ * Optimized with controlled concurrency using semaphore.
  */
+
+// Simple semaphore for controlling concurrent requests
+class Semaphore {
+  private permits: number;
+  private queue: Array<() => void> = [];
+
+  constructor(permits: number) {
+    this.permits = permits;
+  }
+
+  async acquire(): Promise<void> {
+    if (this.permits > 0) {
+      this.permits--;
+      return;
+    }
+    return new Promise<void>((resolve) => {
+      this.queue.push(resolve);
+    });
+  }
+
+  release(): void {
+    this.permits++;
+    const next = this.queue.shift();
+    if (next) {
+      this.permits--;
+      next();
+    }
+  }
+}
+
 async function validateCitationLinks(responseId: string): Promise<void> {
   const rows = await db
     .select({ id: citations.id, url: citations.url })
@@ -285,54 +315,62 @@ async function validateCitationLinks(responseId: string): Promise<void> {
   const urlRows = rows.filter((r) => r.url);
 
   if (urlRows.length === 0) {
-    console.log(`No URLs to validate for response ${responseId}`);
+    console.log(`[Parser] No URLs to validate for response ${responseId}`);
     return;
   }
 
-  // Validate in batches of 10 to avoid overwhelming the network
-  const BATCH_SIZE = 10;
+  console.log(`[Parser] Starting URL validation for ${urlRows.length} URLs...`);
+
+  // Use semaphore to limit concurrent HTTP requests (reduce network pressure)
+  const MAX_CONCURRENT = 5;
+  const semaphore = new Semaphore(MAX_CONCURRENT);
+
+  const validateUrl = async (row: typeof urlRows[0]): Promise<void> => {
+    await semaphore.acquire();
+    try {
+      let httpStatus: number | null = null;
+      let isValid = false;
+
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+
+      try {
+        const res = await fetch(row.url!, {
+          method: "HEAD",
+          signal: controller.signal,
+          redirect: "follow",
+        });
+
+        httpStatus = res.status;
+        isValid = res.ok;
+      } catch {
+        // URL validation failed - mark as invalid
+        isValid = false;
+      }
+
+      clearTimeout(timer);
+
+      await db
+        .update(citations)
+        .set({ isValid, httpStatus })
+        .where(eq(citations.id, row.id));
+    } catch (error) {
+      console.warn(`[Parser] Failed to validate ${row.url}: ${error}`);
+    } finally {
+      semaphore.release();
+    }
+  };
+
+  // Process URLs in batches to avoid overwhelming the system
+  const BATCH_SIZE = 20;
+  let processed = 0;
+
   for (let i = 0; i < urlRows.length; i += BATCH_SIZE) {
     const batch = urlRows.slice(i, i + BATCH_SIZE);
-
-    const results = await Promise.allSettled(
-      batch.map(async (row) => {
-        let httpStatus: number | null = null;
-        let isValid = false;
-
-        try {
-          const controller = new AbortController();
-          const timer = setTimeout(() => controller.abort(), 5000);
-
-          const res = await fetch(row.url!, {
-            method: "HEAD",
-            signal: controller.signal,
-            redirect: "follow",
-          });
-
-          httpStatus = res.status;
-          isValid = res.ok;
-          clearTimeout(timer);
-        } catch (error) {
-          // URL validation failed
-          isValid = false;
-        }
-
-        await db
-          .update(citations)
-          .set({ isValid, httpStatus })
-          .where(eq(citations.id, row.id));
-      }),
-    );
-
-    // Log batch validation summary
-    const successful = results.filter((r) => r.status === 'fulfilled').length;
-    const failed = results.filter((r) => r.status === 'rejected').length;
-    console.log(
-      `Validated batch ${Math.floor(i / BATCH_SIZE) + 1}: ${successful} successful, ${failed} failed`,
-    );
+    await Promise.all(batch.map(validateUrl));
+    processed += batch.length;
+    console.log(`[Parser] Validated ${processed}/${urlRows.length} URLs`);
   }
 
-  console.log(
-    `Validated links for response ${responseId}: ${urlRows.length} URLs checked`,
-  );
+  console.log(`[Parser] URL validation complete for response ${responseId}: ${urlRows.length} URLs checked`);
 }

@@ -21,11 +21,16 @@ type SourceType = "OWN" | "COMPETITOR" | "THIRD_PARTY";
 interface CitationRow {
   id: string;
   responseId: string;
-  brand: string;
-  domain: string;
+  brand: string | null;
+  domain: string | null;
+  url: string | null;
+  hostname: string | null;
+  path: string | null;
   position: number | null;
   confidence: number | null;
   context: string | null;
+  isValid: boolean | null;
+  httpStatus: number | null;
   mentionedBrand: boolean;
   mentionedBrandName: string | null;
   mentionedBrandIsPrimary: boolean;
@@ -290,6 +295,7 @@ export const getProjectResults = async (
       data: {
         visibilityScore: Math.round(visibilityScore * 100) / 100,
         citationRate: Math.round(citationRate * 100) / 100,
+        promptCoverage: Math.round(citationRate * 100) / 100, // alias for frontend compatibility
         mentionFrequency: Math.round(mentionFrequency * 100) / 100,
         avgPosition: Math.round(avgPosition * 100) / 100,
         avgPositionScore: Math.round(avgPositionScore * 100) / 100,
@@ -298,7 +304,31 @@ export const getProjectResults = async (
         totalRuns: runsWithDetails.length,
         totalCitations: brandCitations.length,
         competitorCitations: competitorCitations.length,
-        recentRuns: runsWithDetails.slice(0, 10),
+        // Component breakdown for detailed analysis
+        components: {
+          brandPresence: Math.round((citationRate * 0.35 / 0.35) * 100) / 100, // citationRate contribution
+          authority: Math.round(avgPositionScore * 0.8 * 100) / 100, // approx authority from position
+          competitorComparison: Math.round(shareOfVoice * 100) / 100,
+          visibility: Math.round(confidenceScore * 100) / 100,
+        },
+        // Citation quality metrics
+        citationQuality: {
+          avgConfidence: brandCitations.length > 0
+            ? Math.round((brandCitations.reduce((sum, c) => sum + (c.confidence ?? 1), 0) / brandCitations.length) * 100) / 100
+            : 0,
+          validCitations: brandCitations.filter(c => c.isValid === true).length,
+          invalidCitations: brandCitations.filter(c => c.isValid === false).length,
+          validRate: brandCitations.length > 0
+            ? Math.round((brandCitations.filter(c => c.isValid === true).length / brandCitations.length) * 10000) / 100
+            : 0,
+        },
+        recentRuns: runsWithDetails.slice(0, 10).map(run => ({
+          id: run.id,
+          promptId: run.promptId,
+          engineId: run.engineId,
+          status: 'COMPLETED',
+          finishedAt: run.finishedAt?.toISOString() ?? null,
+        })),
       },
     });
   } catch (error) {

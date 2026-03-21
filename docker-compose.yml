@@ -17,6 +17,20 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # Memory limit for VPS optimization
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
+    command: >
+      postgres
+      -c max_connections=50
+      -c shared_buffers=64MB
+      -c effective_cache_size=128MB
+      -c work_mem=4MB
+      -c maintenance_work_mem=32MB
 
   redis:
     image: redis:7-alpine
@@ -30,6 +44,14 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # Memory limit for VPS optimization
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+        reservations:
+          memory: 64M
+    command: redis-server --maxmemory 96mb --maxmemory-policy allkeys-lru
 
   backend:
     build:
@@ -54,6 +76,13 @@ services:
     volumes:
       - ./backend/src:/app/src
       - ./backend/test:/app/test
+    # Memory limit for VPS optimization
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+        reservations:
+          memory: 192M
     command: npm run dev
 
   worker:
@@ -65,6 +94,11 @@ services:
       NODE_ENV: development
       DATABASE_URL: postgresql://postgres:postgres@postgres:5432/geo_saas
       REDIS_URL: redis://redis:6379
+      # VPS optimization settings
+      WORKER_CONCURRENCY: "1"
+      MAX_BROWSER_CONTEXTS: "1"
+      MEMORY_THRESHOLD_MB: "1200"
+      HEALTH_PORT: "8080"
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +109,20 @@ services:
       - ./worker/test:/app/test
       - /app/node_modules
       - ./chrome-profile:/app/chrome-profile
+    # Memory limit - critical for Playwright
+    deploy:
+      resources:
+        limits:
+          memory: 1200M
+        reservations:
+          memory: 600M
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     command: npm run dev
 
   frontend:
@@ -91,6 +139,13 @@ services:
     volumes:
       - ./frontend/src:/app/src
       - ./frontend/public:/app/public
+    # Memory limit for VPS optimization
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+        reservations:
+          memory: 128M
     command: npm run dev
 
 volumes:

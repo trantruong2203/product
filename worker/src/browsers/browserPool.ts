@@ -103,25 +103,39 @@ function resetEngineProfile(userDataDir: string): void {
 export class BrowserPool {
   private contexts: Map<string, BrowserContext> = new Map();
   private browser?: Browser;
+  
+  // Memory limit: maximum number of browser contexts to keep open
+  // Adjust based on available RAM (each context ~150-300MB)
+  private readonly maxContexts = parseInt(process.env.MAX_BROWSER_CONTEXTS || "2", 10);
 
   async getContext(engine: string): Promise<BrowserContext> {
     engine = engine.toLowerCase();
 
-    // Reuse existing context if available
+    // Check and enforce max context limit
+    if (this.contexts.size >= this.maxContexts) {
+      const oldestEngine = this.contexts.keys().next().value;
+      if (oldestEngine && oldestEngine !== engine) {
+        console.log(`[BrowserPool] Max contexts (${this.maxContexts}) reached, closing oldest: ${oldestEngine}`);
+        await this.closeContext(oldestEngine);
+      }
+    }
+
+    // Reuse existing context if available and valid
     if (this.contexts.has(engine)) {
       const existingContext = this.contexts.get(engine)!;
 
       // Check if context is still valid (not closed)
-      if (existingContext.pages().length > 0 || existingContext.browser()) {
+      if (await this.isContextValid(existingContext)) {
         return existingContext;
       }
 
-      // Context was closed, remove from pool
+      // Context was closed or invalid, remove from pool
+      console.log(`[BrowserPool] Context for ${engine} is invalid, recreating`);
       this.contexts.delete(engine);
     }
 
     console.log(
-      `🚀 Launching browser for ${engine} with stealth + recaptcha mode...`,
+      `[BrowserPool] Launching browser for ${engine} with stealth mode...`,
     );
 
     const userDataDir = path.join(profileDir, engine);
@@ -135,21 +149,30 @@ export class BrowserPool {
     const timezone = getRandomTimezone();
     const locale = getRandomLocale();
 
-    console.log(`   📐 Viewport: ${viewport.width}x${viewport.height}`);
-    console.log(`   🌍 Timezone: ${timezone}`);
-    console.log(`   🌐 Locale: ${locale}`);
+    console.log(`[BrowserPool] Viewport: ${viewport.width}x${viewport.height}`);
+    console.log(`[BrowserPool] Timezone: ${timezone}`);
+    console.log(`[BrowserPool] Locale: ${locale}`);
 
-    // Enhanced stealth launch options
+    // Enhanced stealth launch options with memory optimizations
     const launchOptions = {
       headless: true,
       args: [
+        // Memory optimization flags for VPS
+        "--disable-dev-shm-usage",           // Use tmpfs instead of /dev/shm
+        "--disable-gpu",                      // Disable GPU (no GPU on VPS)
+        "--disable-software-rasterizer",
+        "--disable-gpu-compositing",
+        "--disable-gpu-rasterization",
+        "--disable-gpu-sandbox",
+        "--no-zygote",                       // Disable zygote process
+        "--single-process",                  // Single process mode (reduces memory)
+        
+        // Standard sandbox/security
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-blink-features=AutomationControlled",
-        "--disable-dev-shm-usage",
-        "--disable-accelerated-2d-canvas",
-        "--disable-gpu",
-        "--no-first-run",
+        
+        // Disable unnecessary features
         "--disable-background-networking",
         "--disable-background-timer-throttling",
         "--disable-backgrounding-occluded-windows",
@@ -170,9 +193,18 @@ export class BrowserPool {
         "--no-default-browser-check",
         "--safebrowsing-disable-auto-update",
         "--ignore-gpu-blocklist",
-        "--enable-features=VaapiVideoDecoder",
+        
+        // WebGL/Canvas anti-detection (but disabled for memory)
         "--disable-webgl",
         "--disable-webgl2",
+        "--disable-accelerated-2d-canvas",
+        
+        // Disable unnecessary logging
+        "--disable-logging",
+        "--log-level=0",
+        "--v=0",
+        
+        // Random window position
         `--window-position=${Math.floor(Math.random() * 1000)},${Math.floor(Math.random() * 500)}`,
       ],
       ignoreDefaultArgs: ["--enable-automation", "--enable-logging"],
@@ -187,6 +219,8 @@ export class BrowserPool {
         Connection: "keep-alive",
         "Upgrade-Insecure-Requests": "1",
       },
+      // Reduce memory pressure
+      recordHar: undefined,
     };
 
     let context: BrowserContext;
@@ -194,7 +228,7 @@ export class BrowserPool {
       context = await chromium.launchPersistentContext(userDataDir, launchOptions);
     } catch (error) {
       console.warn(
-        `⚠️ First launch failed for ${engine}, retrying with cleaned lock files...`,
+        `[BrowserPool] First launch failed for ${engine}, retrying with cleaned lock files...`,
       );
       removeChromiumSingletonLocks(userDataDir);
       await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -202,7 +236,7 @@ export class BrowserPool {
         context = await chromium.launchPersistentContext(userDataDir, launchOptions);
       } catch (retryError) {
         console.warn(
-          `⚠️ Second launch failed for ${engine}, resetting profile and retrying...`,
+          `[BrowserPool] Second launch failed for ${engine}, resetting profile and retrying...`,
         );
         // Profile may be corrupted on local Windows runs. Reset only this engine profile.
         resetEngineProfile(userDataDir);
@@ -221,11 +255,47 @@ export class BrowserPool {
 
     // Listen for context close
     context.on("close", () => {
-      console.log(`⚠️ Context for ${engine} was closed`);
+      console.log(`[BrowserPool] Context for ${engine} was closed`);
       this.contexts.delete(engine);
     });
 
+    console.log(`[BrowserPool] Browser launched successfully for ${engine} (active contexts: ${this.contexts.size}/${this.maxContexts})`);
     return context;
+  }
+
+  /**
+   * Check if a browser context is still valid and usable
+   */
+  private async isContextValid(context: BrowserContext): Promise<boolean> {
+    try {
+      const pages = context.pages();
+      if (pages.length === 0) return false;
+      
+      // Try to ping the main page
+      await pages[0].evaluate(() => document.readyState);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get the current number of active contexts
+   */
+  getContextCount(): number {
+    return this.contexts.size;
+  }
+
+  /**
+   * Get memory usage statistics
+   */
+  getMemoryStats(): { contexts: number; maxContexts: number; heapUsedMB: number } {
+    const memoryUsage = process.memoryUsage();
+    return {
+      contexts: this.contexts.size,
+      maxContexts: this.maxContexts,
+      heapUsedMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+    };
   }
 
   private async injectStealthScripts(context: BrowserContext): Promise<void> {
@@ -363,14 +433,15 @@ export class BrowserPool {
     try {
       await context.close();
     } catch (e) {
-      console.error(`Error closing context for ${engine}:`, e);
+      console.error(`[BrowserPool] Error closing context for ${engine}:`, e);
     }
 
     this.contexts.delete(engine);
-    console.log(`✅ Closed browser for ${engine}`);
+    console.log(`[BrowserPool] Closed browser for ${engine} (active contexts: ${this.contexts.size}/${this.maxContexts})`);
   }
 
   async closeAll() {
+    const contextCount = this.contexts.size;
     for (const engine of this.contexts.keys()) {
       await this.closeContext(engine);
     }
@@ -378,10 +449,12 @@ export class BrowserPool {
     if (this.browser) {
       try {
         await this.browser.close();
-      } catch (e) {}
+      } catch (e) {
+        console.error(`[BrowserPool] Error closing browser:`, e);
+      }
     }
 
-    console.log("✅ All browsers closed");
+    console.log(`[BrowserPool] All browsers closed (${contextCount} contexts)`);
   }
 }
 
