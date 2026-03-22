@@ -5,6 +5,8 @@ export interface QueryResult {
   text: string;
   /** Raw innerHTML — used for HTML→Markdown conversion with citations */
   html: string;
+  /** Base64 encoded screenshot */
+  screenshot?: string;
 }
 import { browserPool } from "../browsers/browserPool.js";
 
@@ -260,6 +262,30 @@ export class BaseEngine {
     };
   }
 
+  async takeScreenshot(): Promise<string | null> {
+    if (!this.page) {
+      console.log("⚠️ Cannot take screenshot: page not initialized");
+      return null;
+    }
+
+    try {
+      const screenshot = await this.page.screenshot({
+        type: "png",
+        fullPage: true,
+      });
+
+      const base64Screenshot = Buffer.isBuffer(screenshot)
+        ? screenshot.toString('base64')
+        : Buffer.from(screenshot as ArrayBuffer).toString('base64');
+
+      console.log(`📸 Screenshot captured: ${base64Screenshot.length} bytes`);
+      return base64Screenshot;
+    } catch (error) {
+      console.error("❌ Error taking screenshot:", error);
+      return null;
+    }
+  }
+
 private async detectCaptcha(): Promise<boolean> {
     if (!this.page) return false;
 
@@ -371,20 +397,7 @@ private async detectCaptcha(): Promise<boolean> {
 
     // Try auto-solve with plugin if API key is configured
     if (process.env.RECAPTCHA_API_KEY) {
-      console.log("🔄 Attempting auto-solve with 2Captcha...");
-      try {
-        if (this.page) {
-          // Use the recaptcha plugin to solve
-          const result = await this.page.solveRecaptchas();
-          if (result.solved.length > 0) {
-            console.log("✅ CAPTCHA auto-solved successfully!");
-            await this.randomDelay(2000, 4000);
-            return;
-          }
-        }
-      } catch (e) {
-        console.log("❌ Auto-solve failed:", e);
-      }
+      console.log("🔄 RECAPTCHA_API_KEY configured - CAPTCHA will need manual resolution");
     } else {
       console.log("💡 Set RECAPTCHA_API_KEY in .env to enable auto-solve");
     }

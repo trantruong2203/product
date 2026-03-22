@@ -206,6 +206,7 @@ export const getAnalysisResults = async (
         prompt: promptData[0].query,
         responseText: responseData[0]?.responseText || '',
         responseHtml: responseData[0]?.responseHtml || '',
+        screenshot: responseData[0]?.screenshot || undefined,
         timestamp: runData.Run.finishedAt,
         success: runData.Run.status === 'COMPLETED',
         error: runData.Run.error || null

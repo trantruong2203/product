@@ -788,3 +788,59 @@ export const getPromptRankings = async (
     next(error);
   }
 };
+
+export const getScreenshots = async (
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction
+) => {
+  try {
+    const { projectId } = req.params;
+    const userId = req.user!.id;
+
+    // Verify user owns project
+    const projectList = await db
+      .select()
+      .from(projects)
+      .where(and(
+        eq(projects.id, projectId as string),
+        eq(projects.userId, userId)
+      ));
+
+    if (projectList.length === 0) {
+      throw new AppError("Project not found", 404);
+    }
+
+    // Get all runs with responses that have screenshots
+    const screenshotsData = await db
+      .select({
+        responseId: responses.id,
+        runId: responses.runId,
+        screenshot: responses.screenshot,
+        createdAt: responses.createdAt,
+        promptQuery: prompts.query,
+        engineName: aiEngines.name,
+      })
+      .from(responses)
+      .innerJoin(runs, eq(responses.runId, runs.id))
+      .innerJoin(prompts, eq(runs.promptId, prompts.id))
+      .innerJoin(aiEngines, eq(runs.engineId, aiEngines.id))
+      .where(eq(prompts.projectId, projectId as string))
+      .orderBy(desc(responses.createdAt));
+
+    const screenshots = screenshotsData
+      .filter((s) => s.screenshot)
+      .map((s) => ({
+        id: s.responseId,
+        runId: s.runId,
+        screenshot: s.screenshot,
+        createdAt: s.createdAt,
+        keyword: s.promptQuery,
+        engine: s.engineName,
+      }));
+
+    res.json({ success: true, data: screenshots });
+  } catch (error) {
+    next(error);
+  }
+};

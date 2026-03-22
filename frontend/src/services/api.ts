@@ -98,6 +98,8 @@ export const resultsAPI = {
     api.get(
       `/results/${projectId}/rankings${engineId ? `?engineId=${engineId}` : ""}`,
     ),
+  getScreenshots: (projectId: string) =>
+    api.get(`/results/${projectId}/screenshots`),
 };
 
 export const enginesAPI = {

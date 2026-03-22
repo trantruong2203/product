@@ -21,7 +21,8 @@
     "node-html-markdown": "^2.0.0",
     "pg": "^8.20.0",
     "playwright": "1.40.0",
-    "prom-client": "^15.1.0"
+    "prom-client": "^15.1.0",
+    "redis": "^5.11.0"
   },
   "devDependencies": {
     "@types/node": "^22.9.0",

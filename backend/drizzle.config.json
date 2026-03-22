@@ -3,11 +3,6 @@
   "out": "./drizzle",
   "dialect": "postgresql",
   "dbCredentials": {
-    "host": "postgres",
-    "port": 5432,
-    "user": "postgres",
-    "password": "postgres",
-    "database": "geo_saas",
-    "ssl": false
+    "url": "postgresql://neondb_owner:npg_zLW4NjT2vfDo@ep-restless-bread-ajcy9dsh-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require"
   }
 }

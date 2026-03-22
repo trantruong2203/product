@@ -93,6 +93,7 @@ export const responses = pgTable('Response', {
   runId: text('runId').notNull(),
   responseText: text('responseText').notNull(),
   responseHtml: text('responseHtml'),
+  screenshot: text('screenshot'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
 }, (table) => {
   return {

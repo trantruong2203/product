@@ -80,4 +80,10 @@ export interface IEngine {
    * Wait for the page to be ready for input
    */
   waitForReady(): Promise<void>;
+
+  /**
+   * Take a screenshot of the current page
+   * @returns Base64 encoded PNG image, or null if failed
+   */
+  takeScreenshot(): Promise<string | null>;
 }

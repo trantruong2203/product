@@ -1,37 +1,4 @@
-version: '3.8'
-
 services:
-  postgres:
-    image: postgres:16-alpine
-    container_name: geo_saas_postgres
-    environment:
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
-      POSTGRES_DB: geo_saas
-    ports:
-      - "5432:5432"
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    # Memory limit for VPS optimization
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-        reservations:
-          memory: 128M
-    command: >
-      postgres
-      -c max_connections=50
-      -c shared_buffers=64MB
-      -c effective_cache_size=128MB
-      -c work_mem=4MB
-      -c maintenance_work_mem=32MB
-
   redis:
     image: redis:7-alpine
     container_name: geo_saas_redis
@@ -44,7 +11,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-    # Memory limit for VPS optimization
     deploy:
       resources:
         limits:
@@ -59,30 +25,24 @@ services:
       dockerfile: backend/Dockerfile
     container_name: geo_saas_backend
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/geo_saas
+      NODE_ENV: production
+      DATABASE_URL: postgresql://neondb_owner:npg_zLW4NjT2vfDo@ep-restless-bread-ajcy9dsh-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: your-super-secret-jwt-key-min-32-characters-long-12345
+      JWT_SECRET: 9cdad47cd84f4fed321d09cc91d0b4cf74b2abced3cd47eef8c49e205cb622ab
       JWT_EXPIRES_IN: 7d
       FRONTEND_URL: http://localhost:5173
       PORT: 3001
     ports:
       - "3001:3001"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - ./backend/src:/app/src
-      - ./backend/test:/app/test
-    # Memory limit for VPS optimization
     deploy:
       resources:
         limits:
-          memory: 384M
+          memory: 512M
         reservations:
-          memory: 192M
+          memory: 256M
     command: npm run dev
 
   worker:
@@ -91,25 +51,18 @@ services:
       dockerfile: worker/Dockerfile
     container_name: geo_saas_worker
     environment:
-      NODE_ENV: development
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/geo_saas
+      NODE_ENV: production
+      DATABASE_URL: postgresql://neondb_owner:npg_zLW4NjT2vfDo@ep-restless-bread-ajcy9dsh-pooler.c-3.us-east-2.aws.neon.tech/neondb?sslmode=require
       REDIS_URL: redis://redis:6379
-      # VPS optimization settings
       WORKER_CONCURRENCY: "1"
       MAX_BROWSER_CONTEXTS: "1"
       MEMORY_THRESHOLD_MB: "1200"
       HEALTH_PORT: "8080"
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     volumes:
-      - ./worker/src:/app/src
-      - ./worker/test:/app/test
-      - /app/node_modules
       - ./chrome-profile:/app/chrome-profile
-    # Memory limit - critical for Playwright
     deploy:
       resources:
         limits:
@@ -136,10 +89,6 @@ services:
       - "5173:5173"
     depends_on:
       - backend
-    volumes:
-      - ./frontend/src:/app/src
-      - ./frontend/public:/app/public
-    # Memory limit for VPS optimization
     deploy:
       resources:
         limits:
@@ -149,7 +98,6 @@ services:
     command: npm run dev
 
 volumes:
-  postgres_data:
   redis_data:
 
 networks:

@@ -644,6 +644,34 @@ export abstract class EngineBase implements IEngine {
   }
 
   /**
+   * Take a screenshot of the current page
+   */
+  async takeScreenshot(): Promise<string | null> {
+    if (!this.page) {
+      console.warn("[Engine] Cannot take screenshot: page not initialized");
+      return null;
+    }
+
+    try {
+      const screenshot = await this.page.screenshot({
+        type: "png",
+        fullPage: true,
+      });
+
+      // Convert Buffer to base64 string if needed
+      const base64Screenshot = Buffer.isBuffer(screenshot)
+        ? screenshot.toString('base64')
+        : Buffer.from(screenshot as ArrayBuffer).toString('base64');
+
+      console.log(`[Engine] Screenshot captured: ${base64Screenshot.length} bytes`);
+      return base64Screenshot;
+    } catch (error) {
+      console.error("[Engine] Error taking screenshot:", error);
+      return null;
+    }
+  }
+
+  /**
    * Type text with enhanced human-like delays
    */
   protected async humanType(text: string): Promise<void> {

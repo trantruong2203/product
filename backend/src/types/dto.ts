@@ -65,6 +65,7 @@ export interface EngineResult {
   prompt: string;
   responseText: string;
   responseHtml: string;
+  screenshot?: string;
   timestamp: Date | null;
   success: boolean;
   error: string | null;

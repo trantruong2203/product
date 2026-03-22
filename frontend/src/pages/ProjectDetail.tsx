@@ -37,6 +37,7 @@ import SentimentTab from "../components/geo/SentimentTab";
 import AlertsTab from "../components/geo/AlertsTab";
 import ContentGapTab from "../components/geo/ContentGapTab";
 import ScheduleTab from "../components/geo/ScheduleTab";
+import ScreenshotTab from "../components/geo/ScreenshotTab";
 import "../components/geo/geo.css";
 
 export default function ProjectDetail() {
@@ -69,6 +70,7 @@ export default function ProjectDetail() {
     | "alerts"
     | "content-gap"
     | "schedule"
+    | "screenshots"
   >("overview");
   const [selectedEngine, setSelectedEngine] = useState<string>("");
 
@@ -352,6 +354,12 @@ export default function ProjectDetail() {
         >
           🗓️ Schedule
         </button>
+        <button
+          className={`tab ${activeTab === "screenshots" ? "active" : ""}`}
+          onClick={() => setActiveTab("screenshots")}
+        >
+          📸 Screenshots
+        </button>
       </div>
 
       {activeTab === "overview" && (
@@ -569,6 +577,12 @@ export default function ProjectDetail() {
       {activeTab === "schedule" && (
         <div className="tab-content">
           <ScheduleTab projectId={projectId!} engines={engines} />
+        </div>
+      )}
+
+      {activeTab === "screenshots" && (
+        <div className="tab-content">
+          <ScreenshotTab projectId={projectId!} />
         </div>
       )}
 
