@@ -103,10 +103,13 @@ function resetEngineProfile(userDataDir: string): void {
 export class BrowserPool {
   private contexts: Map<string, BrowserContext> = new Map();
   private browser?: Browser;
-  
+
   // Memory limit: maximum number of browser contexts to keep open
   // Adjust based on available RAM (each context ~150-300MB)
-  private readonly maxContexts = parseInt(process.env.MAX_BROWSER_CONTEXTS || "2", 10);
+  private readonly maxContexts = parseInt(
+    process.env.MAX_BROWSER_CONTEXTS || "2",
+    10,
+  );
 
   async getContext(engine: string): Promise<BrowserContext> {
     engine = engine.toLowerCase();
@@ -115,7 +118,9 @@ export class BrowserPool {
     if (this.contexts.size >= this.maxContexts) {
       const oldestEngine = this.contexts.keys().next().value;
       if (oldestEngine && oldestEngine !== engine) {
-        console.log(`[BrowserPool] Max contexts (${this.maxContexts}) reached, closing oldest: ${oldestEngine}`);
+        console.log(
+          `[BrowserPool] Max contexts (${this.maxContexts}) reached, closing oldest: ${oldestEngine}`,
+        );
         await this.closeContext(oldestEngine);
       }
     }
@@ -158,20 +163,20 @@ export class BrowserPool {
       headless: true,
       args: [
         // Memory optimization flags for VPS
-        "--disable-dev-shm-usage",           // Use tmpfs instead of /dev/shm
-        "--disable-gpu",                      // Disable GPU (no GPU on VPS)
+        "--disable-dev-shm-usage", // Use tmpfs instead of /dev/shm
+        "--disable-gpu", // Disable GPU (no GPU on VPS)
         "--disable-software-rasterizer",
         "--disable-gpu-compositing",
         "--disable-gpu-rasterization",
         "--disable-gpu-sandbox",
-        "--no-zygote",                       // Disable zygote process
-        "--single-process",                  // Single process mode (reduces memory)
-        
+        "--no-zygote", // Disable zygote process
+        "--single-process", // Single process mode (reduces memory)
+
         // Standard sandbox/security
         "--no-sandbox",
         "--disable-setuid-sandbox",
         "--disable-blink-features=AutomationControlled",
-        
+
         // Disable unnecessary features
         "--disable-background-networking",
         "--disable-background-timer-throttling",
@@ -193,17 +198,17 @@ export class BrowserPool {
         "--no-default-browser-check",
         "--safebrowsing-disable-auto-update",
         "--ignore-gpu-blocklist",
-        
+
         // WebGL/Canvas anti-detection (but disabled for memory)
         "--disable-webgl",
         "--disable-webgl2",
         "--disable-accelerated-2d-canvas",
-        
+
         // Disable unnecessary logging
         "--disable-logging",
         "--log-level=0",
         "--v=0",
-        
+
         // Random window position
         `--window-position=${Math.floor(Math.random() * 1000)},${Math.floor(Math.random() * 500)}`,
       ],
@@ -221,11 +226,16 @@ export class BrowserPool {
       },
       // Reduce memory pressure
       recordHar: undefined,
+      executablePath:
+        process.env.PLAYWRIGHT_CHROME_EXECUTABLE_PATH || undefined,
     };
 
     let context: BrowserContext;
     try {
-      context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+      context = await chromium.launchPersistentContext(
+        userDataDir,
+        launchOptions,
+      );
     } catch (error) {
       console.warn(
         `[BrowserPool] First launch failed for ${engine}, retrying with cleaned lock files...`,
@@ -233,7 +243,10 @@ export class BrowserPool {
       removeChromiumSingletonLocks(userDataDir);
       await new Promise((resolve) => setTimeout(resolve, 1000));
       try {
-        context = await chromium.launchPersistentContext(userDataDir, launchOptions);
+        context = await chromium.launchPersistentContext(
+          userDataDir,
+          launchOptions,
+        );
       } catch (retryError) {
         console.warn(
           `[BrowserPool] Second launch failed for ${engine}, resetting profile and retrying...`,
@@ -259,7 +272,9 @@ export class BrowserPool {
       this.contexts.delete(engine);
     });
 
-    console.log(`[BrowserPool] Browser launched successfully for ${engine} (active contexts: ${this.contexts.size}/${this.maxContexts})`);
+    console.log(
+      `[BrowserPool] Browser launched successfully for ${engine} (active contexts: ${this.contexts.size}/${this.maxContexts})`,
+    );
     return context;
   }
 
@@ -270,7 +285,7 @@ export class BrowserPool {
     try {
       const pages = context.pages();
       if (pages.length === 0) return false;
-      
+
       // Try to ping the main page
       await pages[0].evaluate(() => document.readyState);
       return true;
@@ -289,7 +304,11 @@ export class BrowserPool {
   /**
    * Get memory usage statistics
    */
-  getMemoryStats(): { contexts: number; maxContexts: number; heapUsedMB: number } {
+  getMemoryStats(): {
+    contexts: number;
+    maxContexts: number;
+    heapUsedMB: number;
+  } {
     const memoryUsage = process.memoryUsage();
     return {
       contexts: this.contexts.size,
@@ -437,7 +456,9 @@ export class BrowserPool {
     }
 
     this.contexts.delete(engine);
-    console.log(`[BrowserPool] Closed browser for ${engine} (active contexts: ${this.contexts.size}/${this.maxContexts})`);
+    console.log(
+      `[BrowserPool] Closed browser for ${engine} (active contexts: ${this.contexts.size}/${this.maxContexts})`,
+    );
   }
 
   async closeAll() {

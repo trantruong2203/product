@@ -1,0 +1,91 @@
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: geo_saas_redis
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    command: redis-server --maxmemory 96mb --maxmemory-policy allkeys-lru
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: geo_saas_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: 7d
+      FRONTEND_URL: ${FRONTEND_URL}
+      PORT: 3001
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 384M
+
+  worker:
+    build:
+      context: .
+      dockerfile: worker/Dockerfile
+    container_name: geo_saas_worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: ${DATABASE_URL}
+      REDIS_URL: redis://redis:6379
+      WORKER_CONCURRENCY: "1"
+      MAX_BROWSER_CONTEXTS: "1"
+      MEMORY_THRESHOLD_MB: "1200"
+      PLAYWRIGHT_CHROME_EXECUTABLE_PATH: /ms-playwright/chromium-1091/chrome-linux/chrome
+      # Login credentials (optional - for auto-login scripts)
+      GEMINI_EMAIL: ${GEMINI_EMAIL:-}
+      GEMINI_PASSWORD: ${GEMINI_PASSWORD:-}
+      CHATGPT_EMAIL: ${CHATGPT_EMAIL:-}
+      CHATGPT_PASSWORD: ${CHATGPT_PASSWORD:-}
+      CLAUDE_EMAIL: ${CLAUDE_EMAIL:-}
+      CLAUDE_PASSWORD: ${CLAUDE_PASSWORD:-}
+    depends_on:
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./chrome-profile:/app/chrome-profile
+    deploy:
+      resources:
+        limits:
+          memory: 1200M
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL}
+    container_name: geo_saas_frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+volumes:
+  redis_data:
+
+networks:
+  default:
+    name: geo_saas_network
