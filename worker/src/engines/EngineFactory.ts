@@ -6,7 +6,6 @@ import { IEngine } from "./IEngine.js";
 import { ChatGPTEngine } from "./ChatGPTEngine.js";
 import { GeminiEngine } from "./GeminiEngine.js";
 import { ClaudeEngine } from "./ClaudeEngine.js";
-import { BaseEngine } from "./baseEngine.js";
 
 /**
  * Get an engine instance by name
@@ -35,16 +34,6 @@ export function getEngine(engineName: string): IEngine {
     default:
       throw new Error(`Unsupported engine: ${engineName}. Supported engines: ChatGPT, Gemini, Claude`);
   }
-}
-
-/**
- * Legacy function for backward compatibility
- * Returns the old BaseEngine for existing code
- *
- * @deprecated Use getEngine() instead for new implementations
- */
-export function getLegacyEngine(engineName: string): BaseEngine {
-  return new BaseEngine(engineName);
 }
 
 /**

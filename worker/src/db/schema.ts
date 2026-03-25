@@ -94,6 +94,11 @@ export const responses = pgTable('Response', {
   responseText: text('responseText').notNull(),
   responseHtml: text('responseHtml'),
   screenshot: text('screenshot'),
+  // GEO metrics
+  brandMentionCount: integer('brandMentionCount'),
+  citationCount: integer('citationCount'),
+  validCitationCount: integer('validCitationCount'),
+  geoScore: real('geoScore'),
   createdAt: timestamp('createdAt').defaultNow().notNull(),
 }, (table) => {
   return {

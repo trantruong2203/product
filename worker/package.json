@@ -10,9 +10,8 @@
     "login:chatgpt": "tsx src/scripts/loginChatgpt.ts",
     "login:claude": "tsx src/scripts/loginClaude.ts",
     "login:gemini": "tsx src/scripts/loginGemini.ts",
-    "login:perplexity": "tsx src/scripts/loginPerplexity.ts",
-    "test": "node --import tsx --test \"test/**/*.test.ts\"",
-    "test:watch": "node --import tsx --test --watch \"test/**/*.test.ts\""
+    "generate:prompts": "tsx src/scripts/generatePrompts.ts",
+    "insert:prompts": "tsx src/scripts/insertPrompts.ts"
   },
   "dependencies": {
     "bullmq": "^5.28.2",

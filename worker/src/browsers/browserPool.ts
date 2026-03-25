@@ -264,6 +264,9 @@ export class BrowserPool {
     // Inject additional stealth scripts
     await this.injectStealthScripts(context);
 
+    // Block unnecessary resource loading for performance
+    await this.blockUnnecessaryResources(context);
+
     this.contexts.set(engine, context);
 
     // Listen for context close
@@ -317,10 +320,57 @@ export class BrowserPool {
     };
   }
 
+  /**
+   * Block unnecessary resource loading to improve performance
+   * Blocks: images, CSS, fonts, media (audio/video), tracking pixels
+   */
+  private async blockUnnecessaryResources(context: BrowserContext): Promise<void> {
+    const blockedPatterns = [
+      // Images
+      /\.(?:png|jpg|jpeg|gif|svg|ico|webp|bmp|tiff|avif)$/i,
+      /images|img|pics|photos|thumbnails|avatars|logos?|icons?|banners?/i,
+
+      // CSS and stylesheets
+      /\.(?:css|less|sass|scss|styl)$/i,
+
+      // Fonts
+      /\.(?:woff2?|woff|ttf|otf|eot)$/i,
+      /fonts\.(?:googleapis|gstatic)\.com/i,
+
+      // Media (audio/video)
+      /\.(?:mp3|mp4|webm|ogg|wav|flac|aac|m4a)$/i,
+
+      // Tracking pixels and beacons
+      /pixel|beacon|track|analytics|telemetry/i,
+    ];
+
+    await context.route("**/*", async (route, request) => {
+      const url = request.url();
+      const resourceType = request.resourceType();
+
+      // Block images, stylesheets, fonts, and media
+      if (["image", "stylesheet", "font", "media"].includes(resourceType)) {
+        await route.abort();
+        return;
+      }
+
+      // Block specific URL patterns
+      for (const pattern of blockedPatterns) {
+        if (pattern.test(url)) {
+          await route.abort();
+          return;
+        }
+      }
+
+      // Allow other requests
+      await route.continue();
+    });
+
+    console.log(`[BrowserPool] Resource blocking enabled`);
+  }
+
   private async injectStealthScripts(context: BrowserContext): Promise<void> {
     const page = await context.newPage();
-
-    // Override webdriver property
     await page.addInitScript(() => {
       // Remove webdriver property
       Object.defineProperty(navigator, "webdriver", {
