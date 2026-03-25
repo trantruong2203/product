@@ -39,11 +39,13 @@ import ContentGapTab from "../components/geo/ContentGapTab";
 import ScheduleTab from "../components/geo/ScheduleTab";
 import ScreenshotTab from "../components/geo/ScreenshotTab";
 import "../components/geo/geo.css";
+import { useBrand } from "../context/BrandContext";
 
 export default function ProjectDetail() {
   const { t } = useTranslation();
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { brands, setSelectedBrand } = useBrand();
   const [project, setProject] = useState<Project | null>(null);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
   const [competitors, setCompetitors] = useState<Competitor[]>([]);
@@ -77,6 +79,12 @@ export default function ProjectDetail() {
   useEffect(() => {
     if (projectId) loadProjectData();
   }, [projectId]);
+
+  useEffect(() => {
+    if (!projectId || brands.length === 0) return;
+    const match = brands.find((b) => b.id === projectId);
+    if (match) setSelectedBrand(match);
+  }, [projectId, brands, setSelectedBrand]);
 
   const loadProjectData = async () => {
     try {

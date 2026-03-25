@@ -9,6 +9,9 @@ ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 COPY worker/package*.json ./
 RUN npm install
 
+# Install Playwright browsers (use pre-installed ones from the image)
+RUN npx playwright install chromium --with-deps
+
 # Copy source code
 COPY worker/src ./src
 COPY worker/tsconfig.json ./

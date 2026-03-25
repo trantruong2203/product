@@ -5,8 +5,8 @@ import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
 import Competitors from './pages/Competitors';
+import ProjectDetail from './pages/ProjectDetail';
 import Layout from './components/layout/Layout';
-import { GeoDashboard } from './pages/GeoDashboard';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -44,10 +44,10 @@ function AppRoutes() {
       <Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
       {/* Protected routes */}
-      <Route path="/" element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+      <Route path="/" element={<ProtectedRoute><BrandProvider><Layout /></BrandProvider></ProtectedRoute>}>
         <Route index element={<Dashboard />} />
+        <Route path="project/:projectId" element={<ProjectDetail />} />
         <Route path="competitors" element={<Competitors />} />
-        <Route path="geo" element={<GeoDashboard />} />
       </Route>
 
       {/* Fallback */}
@@ -60,9 +60,7 @@ function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <BrandProvider>
-          <AppRoutes />
-        </BrandProvider>
+        <AppRoutes />
       </AuthProvider>
     </BrowserRouter>
   );

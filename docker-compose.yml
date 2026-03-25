@@ -57,6 +57,8 @@ services:
       MAX_BROWSER_CONTEXTS: "1"
       MEMORY_THRESHOLD_MB: "1200"
       HEALTH_PORT: "8080"
+      PLAYWRIGHT_BROWSERS_PATH: /ms-playwright
+      PLAYWRIGHT_CHROME_EXECUTABLE_PATH: /ms-playwright/chromium-1091/chrome-linux/chrome
     depends_on:
       redis:
         condition: service_healthy
@@ -82,9 +84,9 @@ services:
       dockerfile: frontend/Dockerfile
     container_name: geo_saas_frontend
     environment:
-      VITE_API_URL: http://localhost:3001
+      VITE_API_URL: http://backend:3001
     ports:
-      - "5173:5173"
+      - "5173:80"
     depends_on:
       - backend
     deploy:

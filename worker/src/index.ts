@@ -24,7 +24,7 @@ const runPromptWorker = new Worker<RunPromptJobData>(
   async (job) => {
     const startTime = Date.now();
     await runPromptJob(job);
-    
+
     // Record job completion metrics
     const durationSeconds = (Date.now() - startTime) / 1000;
     const engine = job.data.engineName || "unknown";
@@ -39,6 +39,9 @@ const runPromptWorker = new Worker<RunPromptJobData>(
       max: 10,
       duration: 1000,
     },
+    // Long-running jobs need extended stalled interval (default is 30s)
+    stalledInterval: 60000, // Check every 60s
+    maxStalledCount: 2,    // Allow 2 stalled attempts before failing
   },
 );
 

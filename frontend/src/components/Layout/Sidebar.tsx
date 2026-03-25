@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { 
   LayoutDashboard, 
-  Target, 
   Users, 
   Settings, 
   Bell, 
@@ -31,7 +30,6 @@ export default function Sidebar({ onLogout, userEmail }: SidebarProps) {
 
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: t('nav.dashboard') },
-    { path: '/geo', icon: Target, label: t('nav.geoAnalysis') },
     { path: '/competitors', icon: Users, label: t('nav.competitors') },
     { path: '/analytics', icon: BarChart3, label: t('nav.analytics') },
     { path: '/alerts', icon: Bell, label: t('nav.alerts') },

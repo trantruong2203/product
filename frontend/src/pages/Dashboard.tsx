@@ -15,7 +15,7 @@ import LoadingSpinner from '../components/shared/LoadingSpinner';
 
 export default function Dashboard() {
   const { t } = useTranslation();
-  const { brands, loading: brandsLoading, createBrand, deleteBrand, refreshBrands } = useBrand();
+  const { brands, loading: brandsLoading, createBrand, deleteBrand, refreshBrands, setSelectedBrand } = useBrand();
   const [projectResults, setProjectResults] = useState<Record<string, ProjectResults>>({});
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
@@ -225,6 +225,7 @@ export default function Dashboard() {
                     <div className="flex gap-2">
                       <Link
                         to={`/project/${brand.id}`}
+                        onClick={() => setSelectedBrand(brand)}
                         className="flex-1 px-4 py-2 bg-accent text-white text-center text-sm font-medium rounded-lg hover:bg-accent/90 transition-colors"
                       >
                         {t('common.view')}
