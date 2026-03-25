@@ -1,17 +1,15 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
-import { authAPI } from '../services/api';
-import { User } from '../types';
-import LanguageSwitcher from '../components/LanguageSwitcher';
+import { Mail, Lock, LogIn } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
+import Button from '../components/shared/Button';
+import Input from '../components/shared/Input';
 
-interface LoginProps {
-  onLogin: (user: User, token: string) => void;
-}
-
-export default function Login({ onLogin }: LoginProps) {
+export default function Login() {
   const { t } = useTranslation();
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -23,11 +21,8 @@ export default function Login({ onLogin }: LoginProps) {
     setLoading(true);
 
     try {
-      const res = await authAPI.login({ email, password });
-      if (res.data.success) {
-        onLogin(res.data.data.user, res.data.data.token);
-        navigate('/');
-      }
+      await login(email, password);
+      navigate('/');
     } catch (err: any) {
       setError(err.response?.data?.message || t('auth.login.error'));
     } finally {
@@ -36,142 +31,81 @@ export default function Login({ onLogin }: LoginProps) {
   };
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-top-actions">
-          <LanguageSwitcher />
-        </div>
-        <h1>GEO SaaS</h1>
-        <h2>{t('auth.login.title')}</h2>
-        {error && <div className="error">{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label>{t('auth.login.email')}</label>
-            <input
+    <div className="min-h-screen bg-gradient-to-br from-primary via-primary-600 to-accent flex items-center justify-center p-4">
+      <div className="w-full max-w-md">
+        {/* Logo Card */}
+        <div className="bg-white rounded-2xl shadow-2xl p-8">
+          <div className="text-center mb-8">
+            <h1 className="text-3xl font-bold text-primary mb-2">GEO SaaS</h1>
+            <p className="text-gray-500">{t('app.tagline')}</p>
+          </div>
+
+          <h2 className="text-2xl font-semibold text-gray-900 mb-6 text-center">
+            {t('auth.login.title')}
+          </h2>
+
+          {error && (
+            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+              {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <Input
               type="email"
+              label={t('auth.login.email')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              icon={<Mail className="w-5 h-5" />}
               required
             />
-          </div>
-          <div className="form-group">
-            <label>{t('auth.login.password')}</label>
-            <input
+
+            <Input
               type="password"
+              label={t('auth.login.password')}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              placeholder="••••••••"
+              icon={<Lock className="w-5 h-5" />}
               required
             />
+
+            <Button
+              type="submit"
+              loading={loading}
+              className="w-full"
+              icon={<LogIn className="w-4 h-4" />}
+            >
+              {loading ? t('auth.login.submitting') : t('auth.login.submit')}
+            </Button>
+          </form>
+
+          <p className="mt-6 text-center text-gray-600">
+            {t('auth.login.noAccount')}{' '}
+            <Link to="/register" className="text-accent hover:text-accent/80 font-medium">
+              {t('auth.login.signup')}
+            </Link>
+          </p>
+        </div>
+
+        {/* Language Switcher */}
+        <div className="mt-4 flex justify-center">
+          <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-2">
+            <select
+              className="bg-transparent text-white border-none text-sm cursor-pointer focus:outline-none"
+              defaultValue={localStorage.getItem('language') || 'en'}
+              onChange={(e) => {
+                localStorage.setItem('language', e.target.value);
+                window.location.reload();
+              }}
+            >
+              <option value="en" className="text-gray-900">{t('common.languages.english')}</option>
+              <option value="vi" className="text-gray-900">{t('common.languages.vietnamese')}</option>
+            </select>
           </div>
-          <button type="submit" disabled={loading} className="btn-primary">
-            {loading ? t('auth.login.submitting') : t('auth.login.submit')}
-          </button>
-        </form>
-        <p className="auth-link">
-          {t('auth.login.noAccount')} <a href="/register">{t('auth.login.signup')}</a>
-        </p>
+        </div>
       </div>
-      <style>{`
-        .auth-page {
-          min-height: 100vh;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          background: #1a1a1a;
-        }
-        .auth-card {
-          background: #2a2a2a;
-          padding: 2rem;
-          border-radius: 8px;
-          width: 100%;
-          max-width: 400px;
-          box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-        .auth-card h1 {
-          text-align: center;
-          color: #646cff;
-          margin-bottom: 0.5rem;
-        }
-        .auth-top-actions {
-          display: flex;
-          justify-content: flex-end;
-          margin-bottom: 0.75rem;
-        }
-        .language-switcher {
-          display: flex;
-          align-items: center;
-          gap: 0.5rem;
-          color: #ccc;
-          font-size: 0.85rem;
-        }
-        .language-switcher select {
-          background: #1a1a1a;
-          color: #fff;
-          border: 1px solid #444;
-          border-radius: 4px;
-          padding: 0.35rem 0.5rem;
-        }
-        .auth-card h2 {
-          text-align: center;
-          color: #fff;
-          margin-bottom: 1.5rem;
-        }
-        .error {
-          background: rgba(255, 68, 68, 0.2);
-          color: #ff4444;
-          padding: 0.75rem;
-          border-radius: 4px;
-          margin-bottom: 1rem;
-          text-align: center;
-        }
-        .form-group {
-          margin-bottom: 1rem;
-        }
-        .form-group label {
-          display: block;
-          margin-bottom: 0.5rem;
-          color: #ccc;
-        }
-        .form-group input {
-          width: 100%;
-          padding: 0.75rem;
-          border: 1px solid #444;
-          border-radius: 4px;
-          background: #1a1a1a;
-          color: #fff;
-          box-sizing: border-box;
-        }
-        .form-group input:focus {
-          outline: none;
-          border-color: #646cff;
-        }
-        .btn-primary {
-          width: 100%;
-          padding: 0.75rem;
-          background: #646cff;
-          color: white;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          font-size: 1rem;
-        }
-        .btn-primary:hover {
-          background: #535bf2;
-        }
-        .btn-primary:disabled {
-          background: #444;
-          cursor: not-allowed;
-        }
-        .auth-link {
-          text-align: center;
-          margin-top: 1rem;
-          color: #888;
-        }
-        .auth-link a {
-          color: #646cff;
-          text-decoration: none;
-        }
-      `}</style>
     </div>
   );
 }

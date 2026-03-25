@@ -4,10 +4,55 @@
     "languages": {
       "english": "English",
       "vietnamese": "Vietnamese"
-    }
+    },
+    "search": "Search...",
+    "filters": "Filters",
+    "refresh": "Refresh",
+    "export": "Export",
+    "save": "Save",
+    "cancel": "Cancel",
+    "close": "Close",
+    "delete": "Delete",
+    "edit": "Edit",
+    "add": "Add",
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "confirm": "Confirm",
+    "yes": "Yes",
+    "no": "No",
+    "actions": "Actions",
+    "status": "Status",
+    "name": "Name",
+    "email": "Email",
+    "domain": "Domain",
+    "date": "Date",
+    "view": "View",
+    "all": "All"
   },
   "app": {
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "tagline": "AI Search Visibility"
+  },
+  "nav": {
+    "dashboard": "Dashboard",
+    "geoAnalysis": "GEO Analysis",
+    "competitors": "Competitors",
+    "analytics": "Analytics",
+    "alerts": "Alerts",
+    "settings": "Settings"
+  },
+  "brand": {
+    "selectBrand": "Select Brand",
+    "newBrand": "+ New Brand",
+    "brandName": "Brand Name",
+    "domain": "Domain",
+    "country": "Country",
+    "language": "Language",
+    "keywords": "Keywords",
+    "createBrand": "Create Brand",
+    "deleteBrand": "Delete Brand",
+    "deleteBrandConfirm": "Are you sure you want to delete this brand? This action cannot be undone."
   },
   "auth": {
     "login": {
@@ -33,12 +78,13 @@
     }
   },
   "dashboard": {
-    "title": "My Projects",
+    "title": "Dashboard",
     "newProject": "+ New Project",
     "empty": "No projects yet. Create your first project to start tracking AI visibility.",
     "visibility": "Visibility",
     "prompts": "Prompts",
     "runs": "Runs",
+    "citations": "Citations",
     "createProject": {
       "title": "Create New Project",
       "brandName": "Brand Name",

@@ -1,13 +1,6 @@
 import { useState, useEffect } from "react";
 import { resultsAPI } from "../../services/api";
 
-interface ScreenshotResponse {
-  id: string;
-  runId: string;
-  screenshot: string | null;
-  createdAt: string;
-}
-
 interface ScreenshotRow {
   id: string;
   runId: string;

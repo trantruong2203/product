@@ -12,9 +12,12 @@ export default function LanguageSwitcher() {
   };
 
   return (
-    <label className="language-switcher">
-      <span>{t("common.language")}:</span>
-      <select value={i18n.resolvedLanguage || i18n.language} onChange={handleChangeLanguage}>
+    <label className="flex items-center gap-2">
+      <select 
+        value={i18n.resolvedLanguage || i18n.language} 
+        onChange={handleChangeLanguage}
+        className="bg-primary-600 text-primary-100 border-none text-sm px-2 py-1 rounded cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary-400"
+      >
         <option value="en">{t("common.languages.english")}</option>
         <option value="vi">{t("common.languages.vietnamese")}</option>
       </select>

@@ -43,7 +43,6 @@ services:
           memory: 512M
         reservations:
           memory: 256M
-    command: npm run dev
 
   worker:
     build:
@@ -76,7 +75,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 60s
-    command: npm run dev
 
   frontend:
     build:
@@ -95,7 +93,6 @@ services:
           memory: 256M
         reservations:
           memory: 128M
-    command: npm run dev
 
 volumes:
   redis_data:

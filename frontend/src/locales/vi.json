@@ -4,10 +4,55 @@
     "languages": {
       "english": "Tiếng Anh",
       "vietnamese": "Tiếng Việt"
-    }
+    },
+    "search": "Tìm kiếm...",
+    "filters": "Bộ lọc",
+    "refresh": "Làm mới",
+    "export": "Xuất",
+    "save": "Lưu",
+    "cancel": "Hủy",
+    "close": "Đóng",
+    "delete": "Xóa",
+    "edit": "Sửa",
+    "add": "Thêm",
+    "loading": "Đang tải...",
+    "error": "Lỗi",
+    "success": "Thành công",
+    "confirm": "Xác nhận",
+    "yes": "Có",
+    "no": "Không",
+    "actions": "Hành động",
+    "status": "Trạng thái",
+    "name": "Tên",
+    "email": "Email",
+    "domain": "Tên miền",
+    "date": "Ngày",
+    "view": "Xem",
+    "all": "Tất cả"
   },
   "app": {
-    "loading": "Đang tải..."
+    "loading": "Đang tải...",
+    "tagline": "AI Search Visibility"
+  },
+  "nav": {
+    "dashboard": "Bảng điều khiển",
+    "geoAnalysis": "Phân tích GEO",
+    "competitors": "Đối thủ",
+    "analytics": "Phân tích",
+    "alerts": "Cảnh báo",
+    "settings": "Cài đặt"
+  },
+  "brand": {
+    "selectBrand": "Chọn Thương hiệu",
+    "newBrand": "+ Thương hiệu mới",
+    "brandName": "Tên Thương hiệu",
+    "domain": "Tên miền",
+    "country": "Quốc gia",
+    "language": "Ngôn ngữ",
+    "keywords": "Từ khóa",
+    "createBrand": "Tạo Thương hiệu",
+    "deleteBrand": "Xóa Thương hiệu",
+    "deleteBrandConfirm": "Bạn có chắc muốn xóa thương hiệu này? Hành động này không thể hoàn tác."
   },
   "auth": {
     "login": {
@@ -33,12 +78,13 @@
     }
   },
   "dashboard": {
-    "title": "Dự Án Của Tôi",
+    "title": "Bảng Điều Khiển",
     "newProject": "+ Dự Án Mới",
     "empty": "Chưa có dự án nào. Tạo dự án đầu tiên để bắt đầu theo dõi AI visibility.",
     "visibility": "Hiển thị",
     "prompts": "Prompts",
     "runs": "Lần chạy",
+    "citations": "Trích dẫn",
     "createProject": {
       "title": "Tạo Dự Án Mới",
       "brandName": "Tên Thương hiệu",
